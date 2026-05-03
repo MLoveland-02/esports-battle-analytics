@@ -1,0 +1,22 @@
+{
+  "name": "esports-battle-scraper",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Scraper that pulls tournaments and matches from the ESports Battle API into Supabase.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js && node predict.js",
+    "scrape": "node index.js",
+    "predict": "node predict.js",
+    "cleanup": "node cleanup.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "dotenv": "^16.4.5",
+    "node-fetch": "^3.3.2"
+  }
+}
