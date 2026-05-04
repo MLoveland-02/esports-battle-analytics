@@ -9,7 +9,7 @@ dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 const API_BASE = 'https://football.esportsbattle.com/api';
 const STATUS_FINISHED = 3;
-const LOOKBACK_DAYS = 90;
+const LOOKBACK_DAYS = 365;
 
 const DEFAULT_HEADERS = {
     accept: '*/*',

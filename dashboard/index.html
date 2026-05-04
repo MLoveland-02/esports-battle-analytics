@@ -6,15 +6,17 @@
     <title>Esports Battle Analytics</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
     <style>
         :root {
             --bg: #080808;
             --text: #f3f3f5;
             --muted: #888;
+            --dim: #555;
             --accent: #00ff87;
             --danger: #ff5b5b;
+            --warn: #ffb547;
             --glass: rgba(255,255,255,0.05);
             --glass-strong: rgba(255,255,255,0.07);
             --line: rgba(255,255,255,0.08);
@@ -24,16 +26,15 @@
         html, body { background: var(--bg); margin: 0; padding: 0; }
         body {
             font-family: 'Inter', -apple-system, system-ui, sans-serif;
-            color: var(--text);
-            font-weight: 400;
+            color: var(--text); font-weight: 400;
             -webkit-font-smoothing: antialiased;
             min-width: 1200px;
             font-feature-settings: 'cv11', 'ss01';
         }
         a { color: inherit; text-decoration: none; }
-        button { font-family: inherit; border: none; cursor: pointer; }
+        button, select { font-family: inherit; }
+        button { border: none; cursor: pointer; }
 
-        /* Glass primitive */
         .glass {
             background: var(--glass);
             backdrop-filter: blur(12px);
@@ -43,14 +44,18 @@
         }
         .accent { color: var(--accent); }
         .muted { color: var(--muted); }
+        .dim { color: var(--dim); }
         .num { text-align: right; font-variant-numeric: tabular-nums; }
+        .right { margin-left: auto; }
+        .nowrap { white-space: nowrap; }
+        .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
         /* Top nav */
         #topnav {
             position: sticky; top: 0; z-index: 100;
             padding: 14px 32px;
             display: flex; align-items: center; gap: 24px;
-            background: rgba(8,8,8,0.75);
+            background: rgba(8,8,8,0.78);
             backdrop-filter: blur(24px);
             -webkit-backdrop-filter: blur(24px);
             border-bottom: 1px solid var(--line-soft);
@@ -67,8 +72,8 @@
             border-radius: 10px;
             font: 400 14px 'Inter', sans-serif;
         }
-        .search-input:focus { outline: none; border-color: rgba(0,255,135,0.35); background: var(--glass-strong); }
-        .search-input::placeholder { color: #555; }
+        .search-input:focus { outline: none; border-color: rgba(0,255,135,0.4); background: var(--glass-strong); }
+        .search-input::placeholder { color: var(--dim); }
         .search-dropdown {
             position: absolute; top: calc(100% + 6px); left: 0; right: 0;
             background: rgba(18,18,20,0.96);
@@ -98,9 +103,47 @@
             border-radius: 8px;
             color: var(--text);
             font-size: 13px; font-weight: 500;
+            display: inline-flex; align-items: center; gap: 6px;
         }
         .btn:hover { background: var(--glass-strong); border-color: rgba(255,255,255,0.14); }
-        .btn.active { background: rgba(0,255,135,0.12); border-color: rgba(0,255,135,0.35); color: var(--accent); }
+        .btn.active { background: rgba(0,255,135,0.12); border-color: rgba(0,255,135,0.4); color: var(--accent); }
+        .btn.primary { background: var(--accent); color: #001a0e; border-color: var(--accent); font-weight: 700; }
+        .btn.primary:hover { filter: brightness(1.1); }
+        .small-btn { padding: 6px 12px; font-size: 12px; }
+
+        /* Activity ticker */
+        .ticker-wrap {
+            background: rgba(13,13,15,0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--line-soft);
+            padding: 10px 0;
+            overflow: hidden;
+            position: relative;
+        }
+        .ticker-wrap::before, .ticker-wrap::after {
+            content: ''; position: absolute; top: 0; bottom: 0; width: 60px; z-index: 5; pointer-events: none;
+        }
+        .ticker-wrap::before { left: 0; background: linear-gradient(to right, var(--bg), transparent); }
+        .ticker-wrap::after { right: 0; background: linear-gradient(to left, var(--bg), transparent); }
+        .ticker-track {
+            display: flex; gap: 28px; align-items: center;
+            white-space: nowrap;
+            animation: ticker-scroll 90s linear infinite;
+            width: max-content;
+        }
+        .ticker-track:hover { animation-play-state: paused; }
+        .ticker-item {
+            display: inline-flex; align-items: center; gap: 8px;
+            font-size: 13px; padding: 0 14px; border-right: 1px solid var(--line-soft);
+        }
+        .ticker-item:last-child { border-right: 0; }
+        .ticker-item .score { font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+        .ticker-item .meta { color: var(--muted); font-size: 11px; margin-left: 4px; }
+        @keyframes ticker-scroll {
+            from { transform: translateX(0); }
+            to { transform: translateX(-50%); }
+        }
 
         /* Drawer */
         .drawer-backdrop {
@@ -129,37 +172,35 @@
         }
         .players-drawer a {
             display: block; padding: 9px 12px; border-radius: 8px;
-            font-size: 14px; transition: background 0.1s;
+            font-size: 14px;
         }
         .players-drawer a:hover { background: rgba(0,255,135,0.1); color: var(--accent); }
+        .players-drawer .group-block { margin-bottom: 18px; }
+        .players-drawer .group-block .gname { font-size: 11px; color: var(--accent); text-transform: uppercase; letter-spacing: 1.4px; padding: 6px 12px; font-weight: 600; }
 
         /* Main */
-        main { max-width: 1400px; margin: 0 auto; padding: 32px; }
-        section { margin-bottom: 40px; }
+        main { max-width: 1400px; margin: 0 auto; padding: 28px 32px 64px; }
+        section { margin-bottom: 38px; }
         .section-title {
             font-size: 11px; text-transform: uppercase; letter-spacing: 1.6px;
             color: var(--muted); font-weight: 600; margin: 0 0 16px;
+            display: flex; align-items: center; gap: 10px;
         }
+        .section-title .right { margin-left: auto; color: var(--muted); font-size: 12px; text-transform: none; letter-spacing: 0; }
 
         /* Stat cards */
         .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
         .stat-card { padding: 22px 24px; }
-        .stat-card .label {
-            font-size: 11px; color: var(--muted); text-transform: uppercase;
-            letter-spacing: 1.4px; font-weight: 600; margin-bottom: 12px;
-        }
-        .stat-card .value { font-size: 30px; font-weight: 700; letter-spacing: -0.4px; line-height: 1; }
+        .stat-card .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1.4px; font-weight: 600; margin-bottom: 12px; }
+        .stat-card .value { font-size: 28px; font-weight: 700; letter-spacing: -0.4px; line-height: 1.1; }
         .stat-card .value.accent { color: var(--accent); }
         .stat-card .delta { font-size: 12px; color: var(--muted); margin-top: 8px; }
 
         /* Match cards */
         .match-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-        .match-card { padding: 16px 22px; transition: border-color 0.15s; }
+        .match-card { padding: 16px 22px; }
         .match-card:hover { border-color: rgba(0,255,135,0.2); }
-        .match-row {
-            display: grid; grid-template-columns: 1fr auto 1fr;
-            gap: 14px; align-items: center;
-        }
+        .match-row { display: grid; grid-template-columns: 1fr auto 1fr; gap: 14px; align-items: center; }
         .match-card .player { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
         .match-card .player.right { text-align: right; align-items: flex-end; }
         .match-card .nick { font-weight: 600; font-size: 14px; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -171,7 +212,7 @@
             font-variant-numeric: tabular-nums; letter-spacing: -0.5px;
         }
         .match-card .score.live { color: var(--danger); }
-        .match-card .score.upcoming { font-size: 12px; color: #555; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; }
+        .match-card .score.upcoming { font-size: 12px; color: var(--dim); font-weight: 500; letter-spacing: 1px; text-transform: uppercase; }
         .match-card .score.finished { color: var(--accent); }
         .match-card .meta {
             margin-top: 12px; padding-top: 12px;
@@ -191,35 +232,63 @@
         .badge.live { background: rgba(255,91,91,0.15); color: var(--danger); border: 1px solid rgba(255,91,91,0.35); }
         .badge.upcoming { background: rgba(255,255,255,0.05); color: var(--muted); border: 1px solid var(--line); }
         .badge.finished { background: rgba(0,255,135,0.1); color: var(--accent); border: 1px solid rgba(0,255,135,0.3); }
+        .badge.W { background: rgba(0,255,135,0.15); color: var(--accent); }
+        .badge.D { background: rgba(255,255,255,0.06); color: #aaa; }
+        .badge.L { background: rgba(255,91,91,0.15); color: var(--danger); }
+        .badge.streak-W { background: rgba(0,255,135,0.15); color: var(--accent); border: 1px solid rgba(0,255,135,0.3); }
+        .badge.streak-L { background: rgba(255,91,91,0.15); color: var(--danger); border: 1px solid rgba(255,91,91,0.3); }
+        .badge.streak-D { background: rgba(255,255,255,0.06); color: #aaa; border: 1px solid var(--line); }
+
+        /* Tournament block (collapsible) */
+        .tournament-block { padding: 0; overflow: hidden; }
+        .tournament-block .head {
+            padding: 14px 22px; display: flex; align-items: center; gap: 12px; cursor: pointer;
+            border-bottom: 1px solid transparent;
+        }
+        .tournament-block.open .head { border-bottom-color: var(--line-soft); }
+        .tournament-block .head .tname { font-weight: 600; font-size: 14px; }
+        .tournament-block .head .tdate { color: var(--muted); font-size: 12px; }
+        .tournament-block .head .chev { margin-left: auto; transition: transform 0.15s; color: var(--muted); }
+        .tournament-block.open .head .chev { transform: rotate(90deg); color: var(--accent); }
+        .tournament-block .body { display: none; padding: 0; }
+        .tournament-block.open .body { display: block; }
 
         /* Tables */
         table.data { width: 100%; border-collapse: collapse; }
         table.data th, table.data td {
-            padding: 12px 18px; text-align: left;
+            padding: 11px 18px; text-align: left;
             border-bottom: 1px solid var(--line-soft);
             font-size: 13px;
         }
+        table.data tr:last-child td { border-bottom: 0; }
         table.data th {
             font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px;
             color: var(--muted); font-weight: 600; background: rgba(255,255,255,0.02);
         }
         table.data tbody tr:hover { background: rgba(255,255,255,0.02); }
         .table-wrap { overflow: hidden; }
+        .scroll-table { overflow: auto; max-height: 70vh; }
+        .scroll-table table.data thead th { position: sticky; top: 0; background: rgba(15,15,17,0.95); z-index: 1; }
 
         /* Player profile */
-        .player-header { padding: 32px 36px; display: grid; grid-template-columns: 1fr auto; gap: 32px; align-items: center; }
-        .player-header .name { font-size: 38px; font-weight: 700; letter-spacing: -1px; line-height: 1; margin-bottom: 18px; }
-        .player-header .quick { display: flex; gap: 36px; flex-wrap: wrap; }
+        .player-header { padding: 30px 36px; display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: start; }
+        .player-header .name-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+        .player-header .name { font-size: 38px; font-weight: 800; letter-spacing: -1.2px; line-height: 1; }
+        .player-header .group-tag { font-size: 11px; color: var(--accent); text-transform: uppercase; letter-spacing: 1.4px; font-weight: 600; padding: 4px 10px; border: 1px solid rgba(0,255,135,0.3); border-radius: 999px; background: rgba(0,255,135,0.08); }
+        .player-header .role-tag { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1.4px; font-weight: 600; padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--glass); }
+        .player-header .quick { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 28px; }
         .qs-item .v { font-size: 22px; font-weight: 700; line-height: 1; margin-bottom: 4px; }
         .qs-item .v.accent { color: var(--accent); }
         .qs-item .l { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1.2px; font-weight: 600; }
 
-        .form-strip { display: flex; gap: 5px; align-items: center; }
+        .form-strip { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+        .form-strip.compact { gap: 3px; }
         .form-dot {
-            width: 30px; height: 30px; border-radius: 7px;
-            display: flex; align-items: center; justify-content: center;
-            font-weight: 700; font-size: 11px;
+            width: 26px; height: 26px; border-radius: 6px;
+            display: inline-flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 10px; flex-shrink: 0;
         }
+        .form-strip.compact .form-dot { width: 18px; height: 18px; font-size: 9px; border-radius: 4px; }
         .form-dot.W { background: rgba(0,255,135,0.16); color: var(--accent); border: 1px solid rgba(0,255,135,0.35); }
         .form-dot.D { background: rgba(255,255,255,0.06); color: #aaa; border: 1px solid var(--line); }
         .form-dot.L { background: rgba(255,91,91,0.14); color: var(--danger); border: 1px solid rgba(255,91,91,0.3); }
@@ -230,9 +299,10 @@
         .opp-card { padding: 20px; }
         .opp-card .nick { font-size: 17px; font-weight: 700; margin-bottom: 4px; }
         .opp-card .sub { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 14px; font-weight: 600; }
-        .opp-card .row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+        .opp-card .row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 14px; }
         .opp-card .row .v { font-size: 18px; font-weight: 700; line-height: 1; margin-bottom: 4px; }
         .opp-card .row .l { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; }
+        .opp-card .last5 { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); }
 
         .h2h-result { padding: 28px; display: grid; grid-template-columns: 1fr auto 1fr; gap: 28px; align-items: center; }
         .h2h-result .col { text-align: center; }
@@ -242,12 +312,18 @@
         .h2h-result .row { margin-top: 12px; }
         .h2h-result .row:first-child { margin-top: 0; }
         .h2h-result .label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-top: 6px; font-weight: 600; }
+        .h2h-extras { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; padding: 22px 28px; border-top: 1px solid var(--line-soft); margin-top: 0; }
+        .h2h-extras .ext { text-align: center; }
+        .h2h-extras .ext .v { font-size: 20px; font-weight: 700; color: var(--accent); line-height: 1; }
+        .h2h-extras .ext .l { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-top: 6px; font-weight: 600; }
 
         .chart-wrap { padding: 24px; height: 300px; position: relative; }
         .chart-wrap canvas { max-height: 252px; }
+        .chart-wrap.tall { height: 360px; }
+        .chart-wrap.tall canvas { max-height: 312px; }
 
         .controls { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; }
-        .controls input { padding: 9px 13px; min-width: 200px; }
+        .controls input, .controls select { padding: 9px 13px; min-width: 200px; }
 
         .filter-pills { display: flex; gap: 8px; }
         .pill {
@@ -261,37 +337,72 @@
 
         .check { color: var(--accent); font-weight: 700; }
         .cross { color: var(--danger); font-weight: 700; }
-        .dim { color: #555; }
 
         .empty { padding: 40px; text-align: center; color: var(--muted); font-style: italic; font-size: 13px; }
         .loading { padding: 40px; text-align: center; color: var(--muted); font-size: 13px; }
 
-        .scroll-table { overflow: auto; max-height: 70vh; }
-        .scroll-table table.data thead th { position: sticky; top: 0; background: rgba(15,15,17,0.95); }
-
         a.player-link { color: var(--text); border-bottom: 1px dotted transparent; transition: color 0.1s; }
         a.player-link:hover { color: var(--accent); border-bottom-color: var(--accent); }
 
-        .row-flex { display: flex; gap: 16px; align-items: center; }
-        .right { margin-left: auto; }
-        .small-btn { padding: 6px 12px; font-size: 12px; }
+        /* Group cards */
+        .groups-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+        .group-card { padding: 22px 24px; cursor: pointer; transition: border-color 0.15s; }
+        .group-card:hover { border-color: rgba(0,255,135,0.3); }
+        .group-card .ghead { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+        .group-card .gname { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+        .group-card .gcount { font-size: 11px; color: var(--muted); margin-left: auto; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
+        .group-card .members { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+        .group-card .members a { padding: 4px 10px; background: var(--glass); border: 1px solid var(--line); border-radius: 999px; font-size: 12px; }
+        .group-card .members a:hover { background: rgba(0,255,135,0.1); color: var(--accent); border-color: rgba(0,255,135,0.3); }
+        .group-card .mini-table { font-size: 12px; }
+        .group-card .mini-table th, .group-card .mini-table td { padding: 6px 10px; }
+
+        /* Group page */
+        .group-header { padding: 30px 36px; display: flex; align-items: center; gap: 24px; }
+        .group-header .gname { font-size: 36px; font-weight: 800; letter-spacing: -1.2px; line-height: 1; }
+        .group-header .gmeta { color: var(--muted); font-size: 13px; }
+
+        .swap-row { display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line-soft); }
+        .swap-row:last-child { border-bottom: 0; }
+        .swap-row select { background: var(--glass); border: 1px solid var(--line); color: var(--text); padding: 7px 12px; border-radius: 8px; font-size: 12px; min-width: 160px; }
+        .swap-row select:focus { outline: none; border-color: rgba(0,255,135,0.4); }
+        .swap-row .pname { font-weight: 600; font-size: 14px; }
+
+        /* Compare page */
+        .compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+        .compare-stat-row { display: grid; grid-template-columns: 1fr 80px 1fr; gap: 14px; padding: 12px 22px; border-bottom: 1px solid var(--line-soft); align-items: center; font-size: 14px; }
+        .compare-stat-row:last-child { border-bottom: 0; }
+        .compare-stat-row .v { font-weight: 700; font-variant-numeric: tabular-nums; }
+        .compare-stat-row .v.win { color: var(--accent); }
+        .compare-stat-row .lab { text-align: center; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+        .compare-stat-row.left .v.win { text-align: right; }
+        .compare-stat-row .left { text-align: right; }
+        .compare-stat-row .right { text-align: left; margin-left: 0; }
+
+        @media (max-width: 1199px) {
+            body { min-width: 0; }
+        }
     </style>
 </head>
 <body>
     <nav id="topnav">
-        <a class="logo" href="#/">
-            Esports Battle <span class="accent">Analytics</span>
-        </a>
+        <a class="logo" href="#/">Esports Battle <span class="accent">Analytics</span></a>
         <div class="search-wrap">
             <input id="search-input" class="search-input" type="text"
                    placeholder="Search player nickname…" autocomplete="off" spellcheck="false">
             <div id="search-dropdown" class="search-dropdown"></div>
         </div>
         <div class="nav-links">
+            <a class="btn" href="#/groups" id="nav-groups">Groups</a>
+            <a class="btn" href="#/compare" id="nav-compare">Compare</a>
             <a class="btn" href="#/predictions" id="nav-predictions">Predictions</a>
             <button class="btn" id="players-btn">Players</button>
         </div>
     </nav>
+
+    <div id="ticker-wrap" class="ticker-wrap" style="display:none">
+        <div id="ticker-track" class="ticker-track"></div>
+    </div>
 
     <main id="app">
         <div class="loading">Loading…</div>
@@ -312,12 +423,17 @@
 
         const REFRESH_MS = 5 * 60 * 1000;
         const STATUS = { UPCOMING: 1, LIVE: 2, FINISHED: 3 };
+        const FLOAT_GROUP_ID = 8;
 
         const state = {
             players: [],
             playersByName: new Map(),
             playersById: new Map(),
-            currentChart: null,
+            groups: [],
+            groupsById: new Map(),
+            members: [],
+            memberByPlayerId: new Map(),
+            charts: [],
         };
 
         // ---------- utils ----------
@@ -325,6 +441,7 @@
             { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]
         ));
         const fmtTime = (t) => new Date(t).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
+        const fmtDate = (t) => new Date(t).toLocaleDateString(undefined, { dateStyle: 'medium' });
         const fmtAgo = (t) => {
             const s = (Date.now() - new Date(t).getTime()) / 1000;
             if (s < 60) return Math.floor(s) + 's ago';
@@ -337,50 +454,75 @@
             if (!p) return `<span class="dim">#${id}</span>`;
             return `<a class="player-link" href="#/player/${encodeURIComponent(p.nickname)}">${esc(p.nickname)}</a>`;
         };
+        const destroyCharts = () => { state.charts.forEach(c => { try { c.destroy(); } catch(e){} }); state.charts = []; };
+
+        // ---------- result helpers ----------
+        function resultOf(m, playerId) {
+            const isP1 = m.player1_id === playerId;
+            const own = isP1 ? m.score1 : m.score2;
+            const opp = isP1 ? m.score2 : m.score1;
+            if (own == null || opp == null) return null;
+            return own > opp ? 'W' : own < opp ? 'L' : 'D';
+        }
+        function ownGoals(m, playerId) {
+            return m.player1_id === playerId ? m.score1 : m.score2;
+        }
+        function oppGoals(m, playerId) {
+            return m.player1_id === playerId ? m.score2 : m.score1;
+        }
 
         // ---------- routing ----------
         function getRoute() {
             const h = (location.hash || '#/').slice(1);
-            const m = h.match(/^\/player\/(.+)$/);
-            if (m) return { name: 'player', nickname: decodeURIComponent(m[1]) };
+            let m;
+            if ((m = h.match(/^\/player\/(.+)$/))) return { name: 'player', nickname: decodeURIComponent(m[1]) };
             if (h === '/predictions') return { name: 'predictions' };
+            if (h === '/groups') return { name: 'groups' };
+            if ((m = h.match(/^\/group\/(\d+)$/))) return { name: 'group', id: +m[1] };
+            if ((m = h.match(/^\/compare(?:\/(.+?)\/(.+))?$/))) {
+                return { name: 'compare', a: m[1] && decodeURIComponent(m[1]), b: m[2] && decodeURIComponent(m[2]) };
+            }
             return { name: 'home' };
         }
 
         function updateNavActive() {
             const r = getRoute();
-            const predLink = document.getElementById('nav-predictions');
-            predLink.classList.toggle('active', r.name === 'predictions');
+            for (const id of ['nav-groups', 'nav-compare', 'nav-predictions']) {
+                document.getElementById(id).classList.remove('active');
+            }
+            if (r.name === 'groups' || r.name === 'group') document.getElementById('nav-groups').classList.add('active');
+            else if (r.name === 'compare') document.getElementById('nav-compare').classList.add('active');
+            else if (r.name === 'predictions') document.getElementById('nav-predictions').classList.add('active');
         }
 
         async function render() {
             updateNavActive();
-            // Destroy any previous chart instance
-            if (state.currentChart) {
-                state.currentChart.destroy();
-                state.currentChart = null;
-            }
+            destroyCharts();
             const r = getRoute();
             const app = document.getElementById('app');
             app.innerHTML = '<div class="loading">Loading…</div>';
             try {
                 if (r.name === 'home') await renderHome(app);
                 else if (r.name === 'player') await renderPlayer(app, r.nickname);
+                else if (r.name === 'groups') await renderGroups(app);
+                else if (r.name === 'group') await renderGroup(app, r.id);
+                else if (r.name === 'compare') await renderCompare(app, r.a, r.b);
                 else if (r.name === 'predictions') await renderPredictions(app);
             } catch (err) {
                 console.error(err);
                 app.innerHTML = `<div class="empty">Failed to load: ${esc(err.message ?? err)}</div>`;
             }
+            await renderTicker();
         }
-
         window.addEventListener('hashchange', render);
 
-        // ---------- data: bootstrap ----------
-        async function loadAllPlayers() {
+        // ---------- bootstrap ----------
+        async function loadAll(table, columns = '*', applyFilter) {
             const all = []; let from = 0; const PAGE = 1000;
             while (true) {
-                const { data, error } = await sb.from('players')
-                    .select('id, nickname, photo').range(from, from + PAGE - 1);
+                let q = sb.from(table).select(columns).range(from, from + PAGE - 1);
+                if (applyFilter) q = applyFilter(q);
+                const { data, error } = await q;
                 if (error) throw error;
                 all.push(...data);
                 if (data.length < PAGE) break;
@@ -389,103 +531,325 @@
             return all;
         }
 
-        // ---------- data: home ----------
-        async function fetchTopStats() {
-            const [{ count: matchCount }, { count: playerCount }] = await Promise.all([
-                sb.from('matches').select('id', { head: true, count: 'exact' }),
-                sb.from('players').select('id', { head: true, count: 'exact' }),
-            ]);
+        // ---------- queries ----------
+        const MATCH_SELECT = `id, date, status, score1, score2, team1, team2, player1_id, player2_id, tournament_id`;
 
-            // Most active player
-            const { data: topRow } = await sb.from('player_stats')
-                .select('player_id, matches_played')
-                .order('matches_played', { ascending: false })
-                .limit(1);
-            const topPlayer = topRow?.[0]
-                ? { player: state.playersById.get(topRow[0].player_id), matches: topRow[0].matches_played }
-                : null;
-
-            // Predictions accuracy this week (evaluated_at within last 7d)
-            const since = new Date(Date.now() - 7 * 86400 * 1000).toISOString();
-            let predAcc = null;
-            try {
-                const { data: preds, error } = await sb.from('predictions')
-                    .select('winner_correct')
-                    .gte('evaluated_at', since)
-                    .not('winner_correct', 'is', null);
-                if (!error && preds?.length) {
-                    const correct = preds.filter(p => p.winner_correct).length;
-                    predAcc = { pct: Math.round(100 * correct / preds.length), n: preds.length };
-                } else if (!error) {
-                    predAcc = { pct: null, n: 0 };
-                }
-            } catch (e) { /* table may not exist yet */ }
-
-            return { matchCount, playerCount, topPlayer, predAcc };
+        async function fetchAllFinished() {
+            return loadAll('matches', MATCH_SELECT, q => q.eq('status', STATUS.FINISHED).order('date', { ascending: false }));
         }
-
-        const MATCH_SELECT = `id, date, status, score1, score2, team1, team2, player1_id, player2_id`;
-
-        async function fetchLive(limit = 12) {
-            const { data, error } = await sb.from('matches')
-                .select(MATCH_SELECT)
-                .eq('status', STATUS.LIVE)
-                .order('date', { ascending: true })
-                .limit(limit);
+        async function fetchLive() {
+            const { data, error } = await sb.from('matches').select(MATCH_SELECT)
+                .eq('status', STATUS.LIVE).order('date', { ascending: true }).limit(20);
             if (error) throw error;
             return data ?? [];
         }
-
         async function fetchUpcoming(limit = 20) {
-            const { data, error } = await sb.from('matches')
-                .select(MATCH_SELECT)
-                .eq('status', STATUS.UPCOMING)
-                .order('date', { ascending: true })
-                .limit(limit);
+            const { data, error } = await sb.from('matches').select(MATCH_SELECT)
+                .eq('status', STATUS.UPCOMING).order('date', { ascending: true }).limit(limit);
             if (error) throw error;
             return data ?? [];
         }
-
-        async function fetchPredictionsForMatchIds(matchIds) {
-            if (!matchIds.length) return new Map();
-            const { data, error } = await sb.from('predictions')
-                .select('match_id, predicted_winner_id, predicted_score1, predicted_score2, confidence')
-                .in('match_id', matchIds);
-            if (error) return new Map(); // table may not exist yet
-            return new Map((data ?? []).map(p => [p.match_id, p]));
+        async function fetchPredictionsForMatchIds(ids) {
+            if (!ids.length) return new Map();
+            try {
+                const { data, error } = await sb.from('predictions')
+                    .select('match_id, predicted_winner_id, predicted_score1, predicted_score2, confidence')
+                    .in('match_id', ids);
+                if (error) return new Map();
+                return new Map((data ?? []).map(p => [p.match_id, p]));
+            } catch { return new Map(); }
+        }
+        async function fetchTournamentsByIds(ids) {
+            if (!ids.length) return new Map();
+            const map = new Map();
+            const BATCH = 200;
+            for (let i = 0; i < ids.length; i += BATCH) {
+                const slice = ids.slice(i, i + BATCH);
+                const { data, error } = await sb.from('tournaments').select('id, name, date').in('id', slice);
+                if (error) throw error;
+                for (const t of data ?? []) map.set(t.id, t);
+            }
+            return map;
         }
 
-        async function fetchRecent(limit = 20) {
-            const { data, error } = await sb.from('matches')
-                .select(MATCH_SELECT)
-                .eq('status', STATUS.FINISHED)
-                .order('date', { ascending: false })
-                .limit(limit);
-            if (error) throw error;
-            return data ?? [];
+        // ---------- analytics helpers ----------
+        function pointsForResult(r) { return r === 'W' ? 3 : r === 'D' ? 1 : 0; }
+
+        function buildHottestPlayer(allFinished) {
+            // Last 5 finished per player; W=3 D=1 L=0; sort by points desc.
+            const byPlayer = new Map();
+            for (const m of allFinished) {
+                if (!byPlayer.has(m.player1_id)) byPlayer.set(m.player1_id, []);
+                if (!byPlayer.has(m.player2_id)) byPlayer.set(m.player2_id, []);
+                byPlayer.get(m.player1_id).push(m);
+                byPlayer.get(m.player2_id).push(m);
+            }
+            // matches are sorted desc already
+            const scored = [];
+            for (const [pid, ms] of byPlayer) {
+                const last5 = ms.slice(0, 5);
+                if (!last5.length) continue;
+                let pts = 0;
+                for (const m of last5) {
+                    const r = resultOf(m, pid);
+                    if (r) pts += pointsForResult(r);
+                }
+                scored.push({ id: pid, points: pts, played: last5.length });
+            }
+            scored.sort((a, b) => b.points - a.points || b.played - a.played);
+            return scored[0] ?? null;
         }
 
-        async function fetchTopPerformersWeek(limit = 5) {
-            const since = new Date(Date.now() - 7 * 86400 * 1000).toISOString();
-            const { data, error } = await sb.from('matches')
-                .select('player1_id, player2_id, score1, score2')
-                .eq('status', STATUS.FINISHED)
-                .gte('date', since);
-            if (error) throw error;
-            const tally = new Map();
-            for (const m of data ?? []) {
-                const inc = (id) => tally.set(id, tally.get(id) || { id, w:0, d:0, l:0, gp:0 });
-                inc(m.player1_id); inc(m.player2_id);
-                const a = tally.get(m.player1_id); const b = tally.get(m.player2_id);
-                a.gp += 1; b.gp += 1;
+        function computeStreak(matchesDescForPlayer, playerId) {
+            // matches in date desc order. Walk and count consecutive same result.
+            let kind = null, count = 0;
+            for (const m of matchesDescForPlayer) {
+                const r = resultOf(m, playerId);
+                if (!r) continue;
+                if (kind === null) { kind = r; count = 1; }
+                else if (r === kind) count++;
+                else break;
+            }
+            return kind ? `${kind}${count}` : null;
+        }
+
+        function computeClutch(allFinished, playerId) {
+            // Find each tournament's "last match" for this player (highest date),
+            // then compute win rate over those vs overall.
+            const involvedAll = allFinished.filter(m => m.player1_id === playerId || m.player2_id === playerId);
+            if (!involvedAll.length) return { clutchPct: null, overallPct: null, n: 0 };
+            const byTour = new Map();
+            for (const m of involvedAll) {
+                const k = m.tournament_id;
+                if (k == null) continue;
+                const cur = byTour.get(k);
+                if (!cur || new Date(m.date) > new Date(cur.date)) byTour.set(k, m);
+            }
+            const clutchSet = [...byTour.values()];
+            const w = (set) => set.filter(m => resultOf(m, playerId) === 'W').length;
+            return {
+                clutchPct: clutchSet.length ? Math.round(100 * w(clutchSet) / clutchSet.length) : null,
+                overallPct: Math.round(100 * w(involvedAll) / involvedAll.length),
+                n: clutchSet.length,
+            };
+        }
+
+        function computeRates(matchesForPlayer, playerId) {
+            let cs = 0, n = 0, hi35 = 0, hi45 = 0, btts = 0;
+            for (const m of matchesForPlayer) {
+                if (m.score1 == null || m.score2 == null) continue;
+                n++;
+                const own = ownGoals(m, playerId), opp = oppGoals(m, playerId);
+                if (opp === 0) cs++;
+                const total = m.score1 + m.score2;
+                if (total > 3.5) hi35++;
+                if (total > 4.5) hi45++;
+                if (m.score1 > 0 && m.score2 > 0) btts++;
+            }
+            const pct = (x) => n ? Math.round(100 * x / n) : 0;
+            return { n, cleanSheetPct: pct(cs), over35Pct: pct(hi35), over45Pct: pct(hi45), bttsPct: pct(btts) };
+        }
+
+        function buildScoreDistribution(matches, playerId) {
+            // Returns {labels: ['1-0','2-1',...], wins: [...], draws: [...], losses: [...]}
+            const buckets = new Map();
+            for (const m of matches) {
+                const own = ownGoals(m, playerId), opp = oppGoals(m, playerId);
+                if (own == null || opp == null) continue;
+                const key = `${own}-${opp}`;
+                if (!buckets.has(key)) buckets.set(key, { wins: 0, draws: 0, losses: 0 });
+                const r = resultOf(m, playerId);
+                if (r === 'W') buckets.get(key).wins++;
+                else if (r === 'D') buckets.get(key).draws++;
+                else if (r === 'L') buckets.get(key).losses++;
+            }
+            const sorted = [...buckets.entries()].sort((a, b) => {
+                const [a1, a2] = a[0].split('-').map(Number);
+                const [b1, b2] = b[0].split('-').map(Number);
+                return (a1 + a2) - (b1 + b2) || a1 - b1;
+            });
+            return {
+                labels: sorted.map(e => e[0]),
+                wins: sorted.map(e => e[1].wins),
+                draws: sorted.map(e => e[1].draws),
+                losses: sorted.map(e => e[1].losses),
+            };
+        }
+
+        function leagueTableForPlayers(playerIds, finishedMatches) {
+            const set = new Set(playerIds);
+            const rows = new Map();
+            for (const id of playerIds) rows.set(id, { id, p:0, w:0, d:0, l:0, gf:0, ga:0 });
+            for (const m of finishedMatches) {
+                if (!set.has(m.player1_id) || !set.has(m.player2_id)) continue;
+                if (m.score1 == null || m.score2 == null) continue;
+                const a = rows.get(m.player1_id), b = rows.get(m.player2_id);
+                a.p++; b.p++;
+                a.gf += m.score1; a.ga += m.score2;
+                b.gf += m.score2; b.ga += m.score1;
                 if (m.score1 > m.score2) { a.w++; b.l++; }
                 else if (m.score1 < m.score2) { a.l++; b.w++; }
                 else { a.d++; b.d++; }
             }
-            return [...tally.values()].sort((a, b) => b.w - a.w || b.gp - a.gp).slice(0, limit);
+            const out = [...rows.values()].map(r => ({ ...r, gd: r.gf - r.ga, pts: r.w * 3 + r.d }));
+            out.sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
+            return out;
         }
 
-        // ---------- renderers: home ----------
+        // ---------- ticker ----------
+        async function renderTicker() {
+            const wrap = document.getElementById('ticker-wrap');
+            const track = document.getElementById('ticker-track');
+            const { data, error } = await sb.from('matches').select(MATCH_SELECT)
+                .eq('status', STATUS.FINISHED)
+                .order('date', { ascending: false })
+                .limit(20);
+            if (error || !data?.length) { wrap.style.display = 'none'; return; }
+            const renderItem = (m) => {
+                const p1 = state.playersById.get(m.player1_id);
+                const p2 = state.playersById.get(m.player2_id);
+                const n1 = p1 ? `<a class="player-link" href="#/player/${encodeURIComponent(p1.nickname)}">${esc(p1.nickname)}</a>` : `#${m.player1_id}`;
+                const n2 = p2 ? `<a class="player-link" href="#/player/${encodeURIComponent(p2.nickname)}">${esc(p2.nickname)}</a>` : `#${m.player2_id}`;
+                return `<span class="ticker-item">
+                    <span>${n1} <span class="score">${m.score1}–${m.score2}</span> ${n2}</span>
+                    <span class="meta">${fmtAgo(m.date)}</span>
+                </span>`;
+            };
+            const items = data.map(renderItem).join('');
+            // Duplicate so the marquee loops seamlessly
+            track.innerHTML = items + items;
+            wrap.style.display = 'block';
+        }
+
+        // ---------- HOME ----------
+        async function renderHome(app) {
+            const [allFinished, live, upcoming] = await Promise.all([
+                fetchAllFinished(),
+                fetchLive(),
+                fetchUpcoming(),
+            ]);
+            const predMap = await fetchPredictionsForMatchIds(upcoming.map(m => m.id));
+            const totalMatchesAll = await sb.from('matches').select('id', { head: true, count: 'exact' });
+
+            // Hottest player
+            const hottest = buildHottestPlayer(allFinished);
+            const hottestLabel = hottest && state.playersById.get(hottest.id)
+                ? `${playerLink(hottest.id)} <span class="muted">${hottest.points} pts</span>`
+                : '<span class="muted">—</span>';
+
+            // Predictions accuracy 7d
+            const since = new Date(Date.now() - 7 * 86400 * 1000).toISOString();
+            let predAcc = null;
+            try {
+                const { data: preds, error } = await sb.from('predictions').select('winner_correct')
+                    .gte('evaluated_at', since).not('winner_correct', 'is', null);
+                if (!error) {
+                    if (preds?.length) {
+                        const c = preds.filter(p => p.winner_correct).length;
+                        predAcc = { pct: Math.round(100 * c / preds.length), n: preds.length };
+                    } else predAcc = { pct: null, n: 0 };
+                }
+            } catch {}
+
+            // Top performers last 7d + streak
+            const since7 = Date.now() - 7 * 86400 * 1000;
+            const week = allFinished.filter(m => new Date(m.date).getTime() >= since7);
+            const tally = new Map();
+            for (const m of week) {
+                const inc = (id) => tally.set(id, tally.get(id) || { id, w:0, d:0, l:0, gp:0 });
+                inc(m.player1_id); inc(m.player2_id);
+                const a = tally.get(m.player1_id); const b = tally.get(m.player2_id);
+                a.gp++; b.gp++;
+                if (m.score1 > m.score2) { a.w++; b.l++; }
+                else if (m.score1 < m.score2) { a.l++; b.w++; }
+                else { a.d++; b.d++; }
+            }
+            const weekTop = [...tally.values()].sort((a, b) => b.w - a.w || b.gp - a.gp).slice(0, 5);
+            const streakFor = (pid) => {
+                const player_matches = allFinished.filter(m => m.player1_id === pid || m.player2_id === pid);
+                return computeStreak(player_matches, pid);
+            };
+
+            // Recent results grouped by tournament (last 10 tournaments)
+            const tourBuckets = new Map();
+            for (const m of allFinished) {
+                if (m.tournament_id == null) continue;
+                if (!tourBuckets.has(m.tournament_id)) tourBuckets.set(m.tournament_id, []);
+                tourBuckets.get(m.tournament_id).push(m);
+            }
+            const tourEntries = [...tourBuckets.entries()].map(([tid, ms]) => ({
+                tid,
+                matches: ms,
+                latest: Math.max(...ms.map(m => new Date(m.date).getTime())),
+            })).sort((a, b) => b.latest - a.latest).slice(0, 10);
+            const tourMeta = await fetchTournamentsByIds(tourEntries.map(e => e.tid));
+
+            app.innerHTML = `
+                <section>
+                    <div class="stats-grid">
+                        ${statCard('Total Matches', `<span class="accent">${totalMatchesAll.count ?? 0}</span>`)}
+                        ${statCard('Tracked Players', state.players.length)}
+                        ${statCard('Prediction Acc · 7d',
+                            predAcc?.n
+                                ? `<span class="accent">${predAcc.pct}%</span> <span class="muted" style="font-size:13px;font-weight:400">(${predAcc.n})</span>`
+                                : '<span class="muted">—</span>')}
+                        ${statCard('Hottest Player', hottestLabel)}
+                    </div>
+                </section>
+
+                <section>
+                    <h2 class="section-title">Live now</h2>
+                    <div class="match-grid">
+                        ${live.length ? live.map(m => matchCard(m)).join('') : '<div class="glass empty" style="grid-column:1/-1">No live matches.</div>'}
+                    </div>
+                </section>
+
+                <section>
+                    <h2 class="section-title">Upcoming · with predictions</h2>
+                    <div class="match-grid">
+                        ${upcoming.length ? upcoming.map(m => matchCard(m, predMap.get(m.id))).join('') : '<div class="glass empty" style="grid-column:1/-1">No upcoming matches.</div>'}
+                    </div>
+                </section>
+
+                <section>
+                    <h2 class="section-title">Recent results · grouped by tournament <span class="right">last 10 tournaments</span></h2>
+                    <div style="display:flex;flex-direction:column;gap:10px">
+                        ${tourEntries.length ? tourEntries.map(e => tournamentBlock(e.tid, e.matches, tourMeta.get(e.tid))).join('') : '<div class="glass empty">No finished tournaments.</div>'}
+                    </div>
+                </section>
+
+                <section>
+                    <h2 class="section-title">Top performers · last 7 days</h2>
+                    <div class="glass table-wrap">
+                        <table class="data">
+                            <thead><tr><th class="num">#</th><th>Player</th><th class="num">Played</th><th class="num">W</th><th class="num">D</th><th class="num">L</th><th>Streak</th></tr></thead>
+                            <tbody>
+                                ${weekTop.length ? weekTop.map((r, i) => {
+                                    const s = streakFor(r.id);
+                                    const cls = s ? `streak-${s[0]}` : '';
+                                    const sBadge = s ? `<span class="badge ${cls}">${s}</span>` : '<span class="dim">—</span>';
+                                    return `<tr>
+                                        <td class="num muted">${i+1}</td>
+                                        <td>${playerLink(r.id)}</td>
+                                        <td class="num">${r.gp}</td>
+                                        <td class="num accent">${r.w}</td>
+                                        <td class="num">${r.d}</td>
+                                        <td class="num">${r.l}</td>
+                                        <td>${sBadge}</td>
+                                    </tr>`;
+                                }).join('') : '<tr><td colspan="7" class="empty">No matches in the last 7 days.</td></tr>'}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            `;
+
+            // Wire up tournament collapsibles
+            app.querySelectorAll('.tournament-block .head').forEach(h => {
+                h.addEventListener('click', () => h.parentElement.classList.toggle('open'));
+            });
+        }
+
         function statCard(label, value, delta = '') {
             return `<div class="glass stat-card">
                 <div class="label">${esc(label)}</div>
@@ -537,125 +901,84 @@
             </div>`;
         }
 
-        async function renderHome(app) {
-            const [stats, live, upcoming, recent, top] = await Promise.all([
-                fetchTopStats(), fetchLive(), fetchUpcoming(), fetchRecent(), fetchTopPerformersWeek(),
-            ]);
-            const predMap = await fetchPredictionsForMatchIds(upcoming.map(m => m.id));
-            const accLabel = stats.predAcc?.n
-                ? `${stats.predAcc.pct}% <span class="muted">(${stats.predAcc.n} graded)</span>`
-                : `<span class="muted">—</span>`;
-            const topLabel = stats.topPlayer?.player
-                ? `${playerLink(stats.topPlayer.player.id)} <span class="muted">(${stats.topPlayer.matches})</span>`
-                : '<span class="muted">—</span>';
-            app.innerHTML = `
-                <section>
-                    <div class="stats-grid">
-                        ${statCard('Total Matches', `<span class="accent">${stats.matchCount ?? 0}</span>`)}
-                        ${statCard('Tracked Players', stats.playerCount ?? 0)}
-                        ${statCard('Prediction Acc · 7d', `<span class="accent">${accLabel}</span>`)}
-                        ${statCard('Most Active', topLabel)}
-                    </div>
-                </section>
-
-                <section>
-                    <h2 class="section-title">Live now</h2>
-                    <div class="match-grid">
-                        ${live.length ? live.map(m => matchCard(m)).join('') : '<div class="glass empty" style="grid-column:1/-1">No live matches.</div>'}
-                    </div>
-                </section>
-
-                <section>
-                    <h2 class="section-title">Upcoming · with predictions</h2>
-                    <div class="match-grid">
-                        ${upcoming.length ? upcoming.map(m => matchCard(m, predMap.get(m.id))).join('') : '<div class="glass empty" style="grid-column:1/-1">No upcoming matches.</div>'}
-                    </div>
-                </section>
-
-                <section>
-                    <h2 class="section-title">Recent results</h2>
-                    <div class="match-grid">
-                        ${recent.length ? recent.map(m => matchCard(m)).join('') : '<div class="glass empty" style="grid-column:1/-1">No recent results.</div>'}
-                    </div>
-                </section>
-
-                <section>
-                    <h2 class="section-title">Top performers · last 7 days</h2>
-                    <div class="glass table-wrap">
-                        <table class="data">
-                            <thead><tr><th class="num">#</th><th>Player</th><th class="num">Played</th><th class="num">W</th><th class="num">D</th><th class="num">L</th></tr></thead>
-                            <tbody>
-                                ${top.length ? top.map((r, i) => `<tr>
-                                    <td class="num muted">${i+1}</td>
-                                    <td>${playerLink(r.id)}</td>
-                                    <td class="num">${r.gp}</td>
-                                    <td class="num accent">${r.w}</td>
-                                    <td class="num">${r.d}</td>
-                                    <td class="num">${r.l}</td>
-                                </tr>`).join('') : '<tr><td colspan="6" class="empty">No matches in the last 7 days.</td></tr>'}
-                            </tbody>
-                        </table>
-                    </div>
-                </section>
-            `;
+        function tournamentBlock(tid, matches, meta) {
+            const ms = [...matches].sort((a, b) => new Date(a.date) - new Date(b.date));
+            const playersInvolved = new Set();
+            ms.forEach(m => { playersInvolved.add(m.player1_id); playersInvolved.add(m.player2_id); });
+            const table = leagueTableForPlayers([...playersInvolved], ms);
+            const rows = table.map((r, i) => `<tr>
+                <td class="num muted">${i+1}</td>
+                <td>${playerLink(r.id)}</td>
+                <td class="num">${r.p}</td>
+                <td class="num">${r.w}</td>
+                <td class="num">${r.d}</td>
+                <td class="num">${r.l}</td>
+                <td class="num">${r.gf}</td>
+                <td class="num">${r.ga}</td>
+                <td class="num">${r.gd >= 0 ? '+' : ''}${r.gd}</td>
+                <td class="num accent">${r.pts}</td>
+            </tr>`).join('');
+            const matchRows = ms.map(m => `<tr>
+                <td>${fmtTime(m.date)}</td>
+                <td>${playerLink(m.player1_id)}</td>
+                <td class="num">${m.score1 ?? '–'} : ${m.score2 ?? '–'}</td>
+                <td>${playerLink(m.player2_id)}</td>
+            </tr>`).join('');
+            return `<div class="glass tournament-block">
+                <div class="head">
+                    <div class="tname">${esc(meta?.name ?? '#' + tid)}</div>
+                    <div class="tdate">${meta?.date ? fmtDate(meta.date) : fmtDate(ms[0].date)}</div>
+                    <div class="chev">›</div>
+                </div>
+                <div class="body">
+                    <table class="data">
+                        <thead><tr><th class="num">#</th><th>Player</th><th class="num">P</th><th class="num">W</th><th class="num">D</th><th class="num">L</th><th class="num">GF</th><th class="num">GA</th><th class="num">GD</th><th class="num">Pts</th></tr></thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                    <div style="border-top:1px solid var(--line-soft)"></div>
+                    <table class="data">
+                        <thead><tr><th>Time</th><th>Player 1</th><th class="num">Score</th><th>Player 2</th></tr></thead>
+                        <tbody>${matchRows}</tbody>
+                    </table>
+                </div>
+            </div>`;
         }
 
-        // ---------- player profile ----------
+        // ---------- PLAYER ----------
         function findPlayerByNickname(nick) {
             return state.playersByName.get(nick.toLowerCase()) ?? null;
         }
 
-        async function fetchPlayerStats(playerId) {
-            const { data, error } = await sb.from('player_stats')
-                .select('*').eq('player_id', playerId).limit(1);
-            if (error) throw error;
-            return data?.[0] ?? null;
-        }
+        async function renderPlayer(app, nickname) {
+            const player = findPlayerByNickname(nickname);
+            if (!player) {
+                app.innerHTML = `<section class="glass empty">No tracked player named "${esc(nickname)}".</section>`;
+                return;
+            }
+            const [allFinished, ps, h2hRows, predAcc] = await Promise.all([
+                fetchAllFinished(),
+                sb.from('player_stats').select('*').eq('player_id', player.id).limit(1).then(r => r.data?.[0] ?? null),
+                sb.from('h2h_stats').select('*').or(`player1_id.eq.${player.id},player2_id.eq.${player.id}`).then(r => r.data ?? []),
+                fetchPlayerPredictionAccuracy(player.id),
+            ]);
 
-        async function fetchPlayerMatches(playerId, limit, offset = 0) {
-            const { data, error } = await sb.from('matches')
-                .select(MATCH_SELECT + ', tournament:tournaments!matches_tournament_id_fkey(name)')
-                .eq('status', STATUS.FINISHED)
-                .or(`player1_id.eq.${playerId},player2_id.eq.${playerId}`)
-                .order('date', { ascending: false })
-                .range(offset, offset + limit - 1);
-            if (error) throw error;
-            return data ?? [];
-        }
+            const playerMatches = allFinished.filter(m =>
+                m.player1_id === player.id || m.player2_id === player.id
+            );
+            // recent form 30
+            const last30Results = playerMatches.slice(0, 30).map(m => resultOf(m, player.id)).filter(Boolean).reverse();
+            const streak = computeStreak(playerMatches, player.id);
+            const clutch = computeClutch(allFinished, player.id);
+            const rates = computeRates(playerMatches, player.id);
+            const winRate = ps?.matches_played ? Math.round(100 * ps.wins / ps.matches_played) : 0;
+            const dist = buildScoreDistribution(playerMatches, player.id);
+            const member = state.memberByPlayerId.get(player.id);
+            const groupTag = member ? `<span class="group-tag">${esc(state.groupsById.get(member.group_id)?.name ?? '?')}</span>` : '';
+            const roleTag = member && member.role !== 'core' ? `<span class="role-tag">${esc(member.role)}</span>` : '';
 
-        async function fetchPlayerH2HRows(playerId) {
-            const { data, error } = await sb.from('h2h_stats')
-                .select('*')
-                .or(`player1_id.eq.${playerId},player2_id.eq.${playerId}`);
-            if (error) throw error;
-            return data ?? [];
-        }
-
-        async function fetchPlayerPredictionAccuracy(playerId) {
-            try {
-                const { data, error } = await sb.from('predictions')
-                    .select('winner_correct, match:matches!predictions_match_id_fkey(player1_id, player2_id)')
-                    .not('winner_correct', 'is', null);
-                if (error) return null;
-                const involved = (data ?? []).filter(p => p.match
-                    && (p.match.player1_id === playerId || p.match.player2_id === playerId));
-                if (!involved.length) return { pct: null, n: 0 };
-                const correct = involved.filter(p => p.winner_correct).length;
-                return { pct: Math.round(100 * correct / involved.length), n: involved.length };
-            } catch (e) { return null; }
-        }
-
-        function resultOf(m, playerId) {
-            const isP1 = m.player1_id === playerId;
-            const own = isP1 ? m.score1 : m.score2;
-            const opp = isP1 ? m.score2 : m.score1;
-            if (own == null || opp == null) return null;
-            return own > opp ? 'W' : own < opp ? 'L' : 'D';
-        }
-
-        function opponentSummary(h2hRows, playerId) {
-            const opps = h2hRows.map(h => {
-                const isP1 = h.player1_id === playerId;
+            // Best/worst opponents — with last 5 result strip vs each
+            const opponents = h2hRows.map(h => {
+                const isP1 = h.player1_id === player.id;
                 const oppId = isP1 ? h.player2_id : h.player1_id;
                 return {
                     oppId,
@@ -667,71 +990,56 @@
                     avg_ga: Number(isP1 ? h.avg_gf_p2 : h.avg_gf_p1),
                 };
             });
-            return opps;
-        }
-
-        async function renderPlayer(app, nickname) {
-            const player = findPlayerByNickname(nickname);
-            if (!player) {
-                app.innerHTML = `<section class="glass empty">No tracked player named "${esc(nickname)}".</section>`;
-                return;
-            }
-            const [ps, matches20, h2hRows, predAcc] = await Promise.all([
-                fetchPlayerStats(player.id),
-                fetchPlayerMatches(player.id, 20, 0),
-                fetchPlayerH2HRows(player.id),
-                fetchPlayerPredictionAccuracy(player.id),
-            ]);
-
-            const last10 = matches20.slice(0, 10);
-            const formStr = last10.map(m => resultOf(m, player.id)).filter(Boolean).reverse();
-            const winRate = ps?.matches_played ? Math.round(100 * ps.wins / ps.matches_played) : 0;
-            const opps = opponentSummary(h2hRows, player.id).filter(o => o.matches_played >= 1);
-            const best = [...opps].filter(o => o.matches_played >= 1)
+            const last5VsOpp = (oppId) => {
+                const ms = playerMatches.filter(m => m.player1_id === oppId || m.player2_id === oppId).slice(0, 5);
+                return ms.map(m => resultOf(m, player.id)).filter(Boolean).reverse();
+            };
+            const best = [...opponents].filter(o => o.matches_played >= 1)
                 .sort((a, b) => (b.wins/b.matches_played) - (a.wins/a.matches_played) || b.matches_played - a.matches_played).slice(0, 3);
-            const worst = [...opps].filter(o => o.matches_played >= 1)
+            const worst = [...opponents].filter(o => o.matches_played >= 1)
                 .sort((a, b) => (b.losses/b.matches_played) - (a.losses/a.matches_played) || b.matches_played - a.matches_played).slice(0, 3);
 
-            const oppCard = (o, kind) => {
-                const wr = o.matches_played ? Math.round(100 * o.wins / o.matches_played) : 0;
-                const lr = o.matches_played ? Math.round(100 * o.losses / o.matches_played) : 0;
-                const opp = state.playersById.get(o.oppId);
-                return `<div class="glass opp-card">
-                    <div class="nick">${opp ? playerLink(o.oppId) : '#' + o.oppId}</div>
-                    <div class="sub">${kind} · ${o.matches_played} matches</div>
-                    <div class="row">
-                        <div><div class="v accent">${kind === 'best' ? wr : lr}%</div><div class="l">${kind === 'best' ? 'win rate' : 'loss rate'}</div></div>
-                        <div><div class="v">${o.avg_gf.toFixed(1)}</div><div class="l">avg gf</div></div>
-                        <div><div class="v">${o.avg_ga.toFixed(1)}</div><div class="l">avg ga</div></div>
-                    </div>
-                </div>`;
-            };
-
             const predLabel = predAcc == null
-                ? '<span class="muted">no predictions table</span>'
-                : predAcc.n === 0 ? '<span class="muted">none graded yet</span>'
-                : `<span class="accent">${predAcc.pct}%</span> <span class="muted">(${predAcc.n} graded)</span>`;
+                ? '<span class="muted">—</span>'
+                : predAcc.n === 0 ? '<span class="muted">none graded</span>'
+                : `<span class="accent">${predAcc.pct}%</span> <span class="muted" style="font-size:12px">(${predAcc.n})</span>`;
+            const streakBadge = streak ? `<span class="badge streak-${streak[0]}">${streak}</span>` : '<span class="muted">—</span>';
+            const clutchVal = clutch.clutchPct == null
+                ? '—'
+                : `<span class="accent">${clutch.clutchPct}%</span> <span class="muted" style="font-size:12px">(${clutch.n})</span>`;
 
             app.innerHTML = `
                 <section class="glass player-header">
                     <div>
-                        <div class="name">${esc(player.nickname)}</div>
+                        <div class="name-row">
+                            <div class="name">${esc(player.nickname)}</div>
+                            ${groupTag}
+                            ${roleTag}
+                            <div style="font-size:13px;color:var(--muted)">Current streak: ${streakBadge}</div>
+                        </div>
                         <div class="quick">
-                            <div class="qs-item"><div class="v accent">${ps?.wins ?? 0}<span class="muted" style="font-weight:400"> · ${ps?.draws ?? 0} · ${ps?.losses ?? 0}</span></div><div class="l">W · D · L</div></div>
+                            <div class="qs-item"><div class="v"><span class="accent">${ps?.wins ?? 0}</span> · ${ps?.draws ?? 0} · ${ps?.losses ?? 0}</div><div class="l">W · D · L</div></div>
                             <div class="qs-item"><div class="v">${winRate}%</div><div class="l">win rate</div></div>
                             <div class="qs-item"><div class="v">${Number(ps?.avg_gf ?? 0).toFixed(2)}</div><div class="l">avg goals for</div></div>
                             <div class="qs-item"><div class="v">${Number(ps?.avg_ga ?? 0).toFixed(2)}</div><div class="l">avg goals against</div></div>
+                            <div class="qs-item"><div class="v">${rates.cleanSheetPct}%</div><div class="l">clean sheet</div></div>
+                            <div class="qs-item"><div class="v">${rates.over35Pct}%</div><div class="l">games &gt;3.5</div></div>
+                            <div class="qs-item"><div class="v">${rates.over45Pct}%</div><div class="l">games &gt;4.5</div></div>
+                            <div class="qs-item"><div class="v">${clutchVal}</div><div class="l">clutch (final)</div></div>
+                            <div class="qs-item"><div class="v">${predLabel}</div><div class="l">predictions acc</div></div>
                             <div class="qs-item"><div class="v">${ps?.matches_played ?? 0}</div><div class="l">matches played</div></div>
-                            <div class="qs-item"><div class="v">${predLabel}</div><div class="l">predictions accuracy</div></div>
                         </div>
+                    </div>
+                    <div>
+                        <a class="btn primary" href="#/compare/${encodeURIComponent(player.nickname)}">Compare</a>
                     </div>
                 </section>
 
                 <section>
-                    <h2 class="section-title">Recent form · last 10</h2>
+                    <h2 class="section-title">Recent form · last 30</h2>
                     <div class="glass" style="padding:22px;">
-                        ${formStr.length
-                            ? `<div class="form-strip">${formStr.map(r => `<div class="form-dot ${r}">${r}</div>`).join('')}</div>`
+                        ${last30Results.length
+                            ? `<div class="form-strip">${last30Results.map(r => `<div class="form-dot ${r}">${r}</div>`).join('')}</div>`
                             : '<div class="muted">No finished matches.</div>'}
                     </div>
                 </section>
@@ -744,16 +1052,25 @@
                 </section>
 
                 <section>
+                    <h2 class="section-title">Score distribution</h2>
+                    <div class="glass chart-wrap tall">
+                        <canvas id="dist-chart"></canvas>
+                    </div>
+                </section>
+
+                <section>
                     <h2 class="section-title">Best opponents</h2>
                     <div class="three-col">
-                        ${best.length ? best.map(o => oppCard(o, 'best')).join('') : '<div class="glass empty" style="grid-column:1/-1">No head-to-head data yet.</div>'}
+                        ${best.length ? best.map(o => oppCardHTML(o, 'best', last5VsOpp(o.oppId))).join('')
+                            : '<div class="glass empty" style="grid-column:1/-1">No head-to-head data.</div>'}
                     </div>
                 </section>
 
                 <section>
                     <h2 class="section-title">Worst opponents</h2>
                     <div class="three-col">
-                        ${worst.length ? worst.map(o => oppCard(o, 'worst')).join('') : '<div class="glass empty" style="grid-column:1/-1">No head-to-head data yet.</div>'}
+                        ${worst.length ? worst.map(o => oppCardHTML(o, 'worst', last5VsOpp(o.oppId))).join('')
+                            : '<div class="glass empty" style="grid-column:1/-1">No head-to-head data.</div>'}
                     </div>
                 </section>
 
@@ -761,11 +1078,11 @@
                     <h2 class="section-title">Recent matches</h2>
                     <div class="glass table-wrap">
                         <table class="data" id="matches-table">
-                            <thead><tr><th>Date</th><th>Result</th><th>Opponent</th><th>Score</th><th>Tournament</th></tr></thead>
-                            <tbody>${matches20.slice(0, 10).map(m => matchRow(m, player.id)).join('')}</tbody>
+                            <thead><tr><th>Date</th><th>Result</th><th>Opponent</th><th>Score</th></tr></thead>
+                            <tbody>${playerMatches.slice(0, 10).map(m => matchRowHTML(m, player.id)).join('')}</tbody>
                         </table>
-                        <div style="padding:14px 18px;border-top:1px solid var(--line-soft);text-align:center">
-                            <button class="btn small-btn" id="load-more">Load more</button>
+                        <div style="padding:12px 18px;border-top:1px solid var(--line-soft);text-align:center">
+                            <button class="btn small-btn" id="load-more" data-n="10" data-total="${playerMatches.length}">Load more</button>
                         </div>
                     </div>
                 </section>
@@ -782,25 +1099,57 @@
                 </section>
             `;
 
-            // Wire up "load more"
-            let loaded = 10;
-            const tbody = document.querySelector('#matches-table tbody');
+            // Goal trend chart
+            const trend = playerMatches.slice(0, 20).reverse();
+            const tCtx = document.getElementById('goal-chart').getContext('2d');
+            state.charts.push(new Chart(tCtx, {
+                type: 'line',
+                data: {
+                    labels: trend.map(m => fmtTime(m.date)),
+                    datasets: [{
+                        label: 'Goals scored',
+                        data: trend.map(m => ownGoals(m, player.id) ?? 0),
+                        borderColor: '#00ff87',
+                        backgroundColor: 'rgba(0,255,135,0.08)',
+                        tension: 0.3, pointRadius: 3, pointHoverRadius: 6,
+                        pointBackgroundColor: '#00ff87', fill: true, borderWidth: 2,
+                    }],
+                },
+                options: chartOpts(),
+            }));
+
+            // Distribution chart (stacked)
+            const dCtx = document.getElementById('dist-chart').getContext('2d');
+            state.charts.push(new Chart(dCtx, {
+                type: 'bar',
+                data: {
+                    labels: dist.labels,
+                    datasets: [
+                        { label: 'Wins',   data: dist.wins,   backgroundColor: 'rgba(0,255,135,0.7)' },
+                        { label: 'Draws',  data: dist.draws,  backgroundColor: 'rgba(255,255,255,0.25)' },
+                        { label: 'Losses', data: dist.losses, backgroundColor: 'rgba(255,91,91,0.7)' },
+                    ],
+                },
+                options: { ...chartOpts(true), scales: { x: chartGrid(), y: { ...chartGrid(), beginAtZero: true, ticks: { stepSize: 1, color: '#666' }, stacked: true } } },
+            }));
+            // Re-config: stacked needs both axes stacked
+            const distChart = state.charts[state.charts.length - 1];
+            distChart.options.scales.x.stacked = true;
+            distChart.update();
+
+            // Load more
             const loadMoreBtn = document.getElementById('load-more');
-            loadMoreBtn.addEventListener('click', async () => {
-                loadMoreBtn.disabled = true;
-                loadMoreBtn.textContent = 'Loading…';
-                const next = await fetchPlayerMatches(player.id, 10, loaded);
-                if (!next.length) {
-                    loadMoreBtn.textContent = 'No more';
-                    return;
-                }
-                tbody.insertAdjacentHTML('beforeend', next.map(m => matchRow(m, player.id)).join(''));
+            const tbody = document.querySelector('#matches-table tbody');
+            let loaded = 10;
+            loadMoreBtn.addEventListener('click', () => {
+                const next = playerMatches.slice(loaded, loaded + 10);
+                if (!next.length) { loadMoreBtn.disabled = true; loadMoreBtn.textContent = 'No more'; return; }
+                tbody.insertAdjacentHTML('beforeend', next.map(m => matchRowHTML(m, player.id)).join(''));
                 loaded += next.length;
-                loadMoreBtn.disabled = false;
-                loadMoreBtn.textContent = 'Load more';
+                if (loaded >= playerMatches.length) { loadMoreBtn.disabled = true; loadMoreBtn.textContent = 'No more'; }
             });
 
-            // Wire up h2h search
+            // H2H search
             const h2hInput = document.getElementById('h2h-input');
             const h2hGo = document.getElementById('h2h-go');
             const h2hOut = document.getElementById('h2h-output');
@@ -821,117 +1170,603 @@
                 const bWins = aIsLo ? h.wins_p2 : h.wins_p1;
                 const aGF = Number(aIsLo ? h.avg_gf_p1 : h.avg_gf_p2);
                 const bGF = Number(aIsLo ? h.avg_gf_p2 : h.avg_gf_p1);
+                // BTTS / Over X.5 across raw matches between this pair
+                const pairMatches = allFinished.filter(m =>
+                    (m.player1_id === player.id && m.player2_id === opp.id) ||
+                    (m.player1_id === opp.id && m.player2_id === player.id)
+                );
+                const r = computeRates(pairMatches, player.id);
+                const wPct = h.matches_played ? Math.round(100 * aWins / h.matches_played) : 0;
+                const lPct = h.matches_played ? Math.round(100 * bWins / h.matches_played) : 0;
+                const dPct = h.matches_played ? Math.round(100 * h.draws / h.matches_played) : 0;
                 h2hOut.innerHTML = `
-                    <div class="h2h-result">
-                        <div class="col">
-                            <div class="nick">${playerLink(player.id)}</div>
-                            <div class="row"><div class="stat-big">${aWins}</div><div class="label">wins</div></div>
-                            <div class="row"><div class="stat-mid">${aGF.toFixed(2)}</div><div class="label">avg goals</div></div>
+                    <div class="glass" style="padding:0">
+                        <div class="h2h-result">
+                            <div class="col">
+                                <div class="nick">${playerLink(player.id)}</div>
+                                <div class="row"><div class="stat-big">${aWins}</div><div class="label">wins (${wPct}%)</div></div>
+                                <div class="row"><div class="stat-mid">${aGF.toFixed(2)}</div><div class="label">avg goals</div></div>
+                            </div>
+                            <div class="col">
+                                <div class="nick muted" style="font-size:11px;letter-spacing:2px;text-transform:uppercase">vs</div>
+                                <div class="row"><div class="stat-big">${h.matches_played}</div><div class="label">matches</div></div>
+                                <div class="row"><div class="stat-mid">${h.draws} <span class="muted" style="font-size:13px">(${dPct}%)</span></div><div class="label">draws</div></div>
+                            </div>
+                            <div class="col">
+                                <div class="nick">${playerLink(opp.id)}</div>
+                                <div class="row"><div class="stat-big">${bWins}</div><div class="label">wins (${lPct}%)</div></div>
+                                <div class="row"><div class="stat-mid">${bGF.toFixed(2)}</div><div class="label">avg goals</div></div>
+                            </div>
                         </div>
-                        <div class="col">
-                            <div class="nick muted" style="font-size:11px;letter-spacing:2px;text-transform:uppercase">vs</div>
-                            <div class="row"><div class="stat-big">${h.matches_played}</div><div class="label">matches</div></div>
-                            <div class="row"><div class="stat-mid">${h.draws}</div><div class="label">draws</div></div>
-                        </div>
-                        <div class="col">
-                            <div class="nick">${playerLink(opp.id)}</div>
-                            <div class="row"><div class="stat-big">${bWins}</div><div class="label">wins</div></div>
-                            <div class="row"><div class="stat-mid">${bGF.toFixed(2)}</div><div class="label">avg goals</div></div>
+                        <div class="h2h-extras">
+                            <div class="ext"><div class="v">${r.bttsPct}%</div><div class="l">BTTS</div></div>
+                            <div class="ext"><div class="v">${r.over35Pct}%</div><div class="l">Over 2.5</div></div>
+                            <div class="ext"><div class="v">${r.over45Pct}%</div><div class="l">Over 3.5</div></div>
+                            <div class="ext"><div class="v">${Math.round(100 * pairMatches.filter(m => (m.score1+m.score2) > 4.5).length / Math.max(1, pairMatches.length))}%</div><div class="l">Over 4.5</div></div>
                         </div>
                     </div>
                 `;
             };
             h2hGo.addEventListener('click', doH2H);
             h2hInput.addEventListener('keydown', e => { if (e.key === 'Enter') doH2H(); });
-
-            // Render goal trend chart
-            const chartData = [...matches20].reverse().map(m => {
-                const isP1 = m.player1_id === player.id;
-                return {
-                    x: new Date(m.date),
-                    y: (isP1 ? m.score1 : m.score2) ?? 0,
-                };
-            });
-            const ctx = document.getElementById('goal-chart').getContext('2d');
-            state.currentChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: chartData.map(p => fmtTime(p.x)),
-                    datasets: [{
-                        label: 'Goals scored',
-                        data: chartData.map(p => p.y),
-                        borderColor: '#00ff87',
-                        backgroundColor: 'rgba(0,255,135,0.08)',
-                        tension: 0.3,
-                        pointRadius: 3,
-                        pointHoverRadius: 6,
-                        pointBackgroundColor: '#00ff87',
-                        fill: true,
-                        borderWidth: 2,
-                    }],
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: { backgroundColor: 'rgba(15,15,17,0.95)', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1 },
-                    },
-                    scales: {
-                        x: { ticks: { color: '#666', maxRotation: 0, autoSkip: true, maxTicksLimit: 6 }, grid: { color: 'rgba(255,255,255,0.04)' } },
-                        y: { ticks: { color: '#666' }, grid: { color: 'rgba(255,255,255,0.04)' }, beginAtZero: true },
-                    },
-                },
-            });
         }
 
-        function matchRow(m, playerId) {
-            const result = resultOf(m, playerId);
+        function chartGrid() {
+            return { ticks: { color: '#666', maxRotation: 0, autoSkip: true, maxTicksLimit: 10 }, grid: { color: 'rgba(255,255,255,0.04)' } };
+        }
+        function chartOpts(showLegend = false) {
+            return {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: showLegend, labels: { color: '#888', font: { family: 'Inter' } } },
+                    tooltip: { backgroundColor: 'rgba(15,15,17,0.95)', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1 },
+                },
+                scales: { x: chartGrid(), y: { ...chartGrid(), beginAtZero: true, ticks: { color: '#666', stepSize: 1 } } },
+            };
+        }
+
+        function oppCardHTML(o, kind, last5) {
+            const wr = o.matches_played ? Math.round(100 * o.wins / o.matches_played) : 0;
+            const lr = o.matches_played ? Math.round(100 * o.losses / o.matches_played) : 0;
+            return `<div class="glass opp-card">
+                <div class="nick">${playerLink(o.oppId)}</div>
+                <div class="sub">${kind} · ${o.matches_played} matches</div>
+                <div class="row">
+                    <div><div class="v accent">${kind === 'best' ? wr : lr}%</div><div class="l">${kind === 'best' ? 'win rate' : 'loss rate'}</div></div>
+                    <div><div class="v">${o.avg_gf.toFixed(1)}</div><div class="l">avg gf</div></div>
+                    <div><div class="v">${o.avg_ga.toFixed(1)}</div><div class="l">avg ga</div></div>
+                </div>
+                <div class="last5">
+                    <span>last 5:</span>
+                    <div class="form-strip compact">
+                        ${last5.length ? last5.map(r => `<div class="form-dot ${r}">${r}</div>`).join('') : '<span class="muted">none</span>'}
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        function matchRowHTML(m, playerId) {
+            const r = resultOf(m, playerId);
             const isP1 = m.player1_id === playerId;
             const oppId = isP1 ? m.player2_id : m.player1_id;
             const own = isP1 ? m.score1 : m.score2;
             const opp = isP1 ? m.score2 : m.score1;
-            const resultBadge = result === 'W' ? '<span class="badge" style="background:rgba(0,255,135,0.15);color:#00ff87">W</span>'
-                : result === 'L' ? '<span class="badge" style="background:rgba(255,91,91,0.15);color:#ff5b5b">L</span>'
-                : '<span class="badge" style="background:rgba(255,255,255,0.06);color:#aaa">D</span>';
+            const badge = r ? `<span class="badge ${r}">${r}</span>` : '<span class="dim">—</span>';
             return `<tr>
                 <td>${fmtTime(m.date)}</td>
-                <td>${resultBadge}</td>
+                <td>${badge}</td>
                 <td>${playerLink(oppId)}</td>
                 <td class="num">${own ?? '–'} : ${opp ?? '–'}</td>
-                <td class="muted">${esc(m.tournament?.name ?? '')}</td>
             </tr>`;
         }
 
-        // ---------- predictions page ----------
-        async function fetchAllPredictions() {
+        async function fetchPlayerPredictionAccuracy(playerId) {
             try {
                 const { data, error } = await sb.from('predictions')
-                    .select(`
-                        id, predicted_winner_id, predicted_score1, predicted_score2, confidence,
-                        winner_correct, score_correct, evaluated_at,
-                        match:matches!predictions_match_id_fkey(id, date, status, score1, score2, player1_id, player2_id)
-                    `)
-                    .order('id', { ascending: false })
-                    .limit(500);
-                if (error) throw error;
-                return data ?? [];
+                    .select('winner_correct, match:matches!predictions_match_id_fkey(player1_id, player2_id)')
+                    .not('winner_correct', 'is', null);
+                if (error) return null;
+                const involved = (data ?? []).filter(p => p.match
+                    && (p.match.player1_id === playerId || p.match.player2_id === playerId));
+                if (!involved.length) return { pct: null, n: 0 };
+                const c = involved.filter(p => p.winner_correct).length;
+                return { pct: Math.round(100 * c / involved.length), n: involved.length };
             } catch (e) { return null; }
         }
 
+        // ---------- GROUPS ----------
+        async function renderGroups(app) {
+            const allFinished = await fetchAllFinished();
+            // Show 7 groups (skip Float Pool)
+            const groups = state.groups.filter(g => g.id !== FLOAT_GROUP_ID);
+            app.innerHTML = `
+                <section>
+                    <h2 class="section-title">Groups</h2>
+                    <div class="groups-grid">
+                        ${groups.map(g => groupCardHTML(g, allFinished)).join('')}
+                    </div>
+                </section>
+
+                <section>
+                    <h2 class="section-title">Float pool</h2>
+                    <div class="glass" style="padding:22px;display:flex;gap:6px;flex-wrap:wrap">
+                        ${state.members.filter(m => m.group_id === FLOAT_GROUP_ID).map(m => {
+                            const p = state.playersById.get(m.player_id);
+                            return p ? `<a class="player-link" style="padding:5px 12px;background:var(--glass);border:1px solid var(--line);border-radius:999px;font-size:13px" href="#/player/${encodeURIComponent(p.nickname)}">${esc(p.nickname)}</a>` : '';
+                        }).join('')}
+                    </div>
+                </section>
+            `;
+        }
+
+        function groupCoreIds(groupId) {
+            return state.members.filter(m => m.group_id === groupId && m.role === 'core').map(m => m.player_id);
+        }
+        function groupAllIds(groupId) {
+            return state.members.filter(m => m.group_id === groupId).map(m => m.player_id);
+        }
+
+        function groupCardHTML(g, allFinished) {
+            const coreIds = groupCoreIds(g.id);
+            const subIds = state.members.filter(m => m.group_id === g.id && m.role === 'sub').map(m => m.player_id);
+            const table = leagueTableForPlayers(coreIds, allFinished);
+            return `<a class="glass group-card" href="#/group/${g.id}">
+                <div class="ghead">
+                    <div class="gname">${esc(g.name)}</div>
+                    <div class="gcount">${coreIds.length} core${subIds.length ? ` · ${subIds.length} sub` : ''}</div>
+                </div>
+                <div class="members">${coreIds.map(id => {
+                    const p = state.playersById.get(id);
+                    return p ? `<a class="player-link" href="#/player/${encodeURIComponent(p.nickname)}" onclick="event.stopPropagation()">${esc(p.nickname)}</a>` : '';
+                }).join('')}</div>
+                <table class="data mini-table">
+                    <thead><tr><th>Player</th><th class="num">P</th><th class="num">W</th><th class="num">D</th><th class="num">L</th><th class="num">GD</th><th class="num">Pts</th></tr></thead>
+                    <tbody>${table.map(r => `<tr>
+                        <td>${playerLink(r.id)}</td>
+                        <td class="num">${r.p}</td>
+                        <td class="num">${r.w}</td>
+                        <td class="num">${r.d}</td>
+                        <td class="num">${r.l}</td>
+                        <td class="num">${r.gd >= 0 ? '+' : ''}${r.gd}</td>
+                        <td class="num accent">${r.pts}</td>
+                    </tr>`).join('')}</tbody>
+                </table>
+            </a>`;
+        }
+
+        async function renderGroup(app, gid) {
+            const g = state.groupsById.get(gid);
+            if (!g) { app.innerHTML = `<section class="glass empty">Group not found.</section>`; return; }
+            const allFinished = await fetchAllFinished();
+            const coreIds = groupCoreIds(gid);
+            const subIds = state.members.filter(m => m.group_id === gid && m.role === 'sub').map(m => m.player_id);
+            const groupAll = groupAllIds(gid);
+            const groupSet = new Set(coreIds);
+            const groupMatches = allFinished.filter(m => groupSet.has(m.player1_id) && groupSet.has(m.player2_id));
+            const table = leagueTableForPlayers(coreIds, allFinished);
+
+            // Tournament history involving group members
+            const tIds = new Set();
+            for (const m of allFinished) {
+                if (groupSet.has(m.player1_id) || groupSet.has(m.player2_id)) tIds.add(m.tournament_id);
+            }
+            const tourMeta = await fetchTournamentsByIds([...tIds]);
+            const tournamentList = [...tIds]
+                .map(tid => {
+                    const ms = allFinished.filter(m => m.tournament_id === tid && (groupSet.has(m.player1_id) || groupSet.has(m.player2_id)));
+                    return { tid, name: tourMeta.get(tid)?.name ?? `#${tid}`, date: ms[0]?.date, count: ms.length };
+                })
+                .sort((a, b) => new Date(b.date) - new Date(a.date))
+                .slice(0, 20);
+
+            // Rivalry tracker
+            const pairs = new Map();
+            for (const m of groupMatches) {
+                const lo = Math.min(m.player1_id, m.player2_id);
+                const hi = Math.max(m.player1_id, m.player2_id);
+                const k = `${lo}:${hi}`;
+                if (!pairs.has(k)) pairs.set(k, { lo, hi, matches: [], goals: 0, draws: 0, upsets: 0 });
+                const ent = pairs.get(k);
+                ent.matches.push(m);
+                if (m.score1 != null && m.score2 != null) {
+                    ent.goals += m.score1 + m.score2;
+                    if (m.score1 === m.score2) ent.draws++;
+                }
+            }
+            // Upsets: lower-Pts player wins. Compute Pts ranking from leagueTable.
+            const ptsById = new Map(table.map(r => [r.id, r.pts]));
+            for (const ent of pairs.values()) {
+                for (const m of ent.matches) {
+                    if (m.score1 == null || m.score2 == null || m.score1 === m.score2) continue;
+                    const winner = m.score1 > m.score2 ? m.player1_id : m.player2_id;
+                    const loser = winner === m.player1_id ? m.player2_id : m.player1_id;
+                    if ((ptsById.get(winner) ?? 0) < (ptsById.get(loser) ?? 0)) ent.upsets++;
+                }
+            }
+            const pairList = [...pairs.values()];
+            const mostGoals = [...pairList].sort((a, b) => b.goals - a.goals)[0];
+            const mostDraws = [...pairList].sort((a, b) => b.draws - a.draws)[0];
+            const mostUpsets = [...pairList].sort((a, b) => b.upsets - a.upsets)[0];
+
+            // Trend analysis
+            const totalRates = computeRates(groupMatches, coreIds[0] ?? -1); // not playerId-specific for BTTS/over
+            // BTTS / Over X.5 are symmetric so playerId doesn't matter for these stats; but we used computeRates which uses playerId for clean sheet. Recompute symmetric.
+            let bttsN = 0, ov25 = 0, ov35 = 0, ov45 = 0, totalN = 0;
+            for (const m of groupMatches) {
+                if (m.score1 == null || m.score2 == null) continue;
+                totalN++;
+                const t = m.score1 + m.score2;
+                if (m.score1 > 0 && m.score2 > 0) bttsN++;
+                if (t > 2.5) ov25++;
+                if (t > 3.5) ov35++;
+                if (t > 4.5) ov45++;
+            }
+            const pct = (x) => totalN ? Math.round(100 * x / totalN) : 0;
+
+            // Tournament-level: draw % first half vs second half; avg goals first vs last per tournament
+            const drawsFirst = [], drawsLast = [], goalsFirst = [], goalsLast = [];
+            const byT = new Map();
+            for (const m of groupMatches) {
+                if (m.tournament_id == null) continue;
+                if (!byT.has(m.tournament_id)) byT.set(m.tournament_id, []);
+                byT.get(m.tournament_id).push(m);
+            }
+            for (const [tid, ms] of byT) {
+                if (ms.length < 2) continue;
+                const sorted = [...ms].sort((a, b) => new Date(a.date) - new Date(b.date));
+                const half = Math.floor(sorted.length / 2);
+                const first = sorted.slice(0, half), last = sorted.slice(-half);
+                drawsFirst.push(...first.map(m => m.score1 === m.score2 ? 1 : 0));
+                drawsLast.push(...last.map(m => m.score1 === m.score2 ? 1 : 0));
+                goalsFirst.push(sorted[0].score1 + sorted[0].score2);
+                goalsLast.push(sorted[sorted.length - 1].score1 + sorted[sorted.length - 1].score2);
+            }
+            const avg = (a) => a.length ? a.reduce((s, x) => s + x, 0) / a.length : 0;
+            const drawPctFirst = drawsFirst.length ? Math.round(100 * avg(drawsFirst)) : null;
+            const drawPctLast = drawsLast.length ? Math.round(100 * avg(drawsLast)) : null;
+            const goalsAvgFirst = goalsFirst.length ? avg(goalsFirst).toFixed(2) : '—';
+            const goalsAvgLast = goalsLast.length ? avg(goalsLast).toFixed(2) : '—';
+
+            // Swap UI: subs in this group + all floats
+            const floats = state.members.filter(m => m.group_id === FLOAT_GROUP_ID);
+            const swappable = [
+                ...subIds.map(id => ({ player_id: id, role: 'sub', label: 'sub' })),
+                ...floats.map(m => ({ player_id: m.player_id, role: 'float', label: 'float' })),
+            ];
+
+            app.innerHTML = `
+                <section class="glass group-header">
+                    <div>
+                        <div class="gname">${esc(g.name)}</div>
+                        <div class="gmeta">${coreIds.length} core · ${subIds.length} sub · ${groupMatches.length} finished group matches</div>
+                    </div>
+                </section>
+
+                <section>
+                    <h2 class="section-title">League table</h2>
+                    <div class="glass table-wrap">
+                        <table class="data">
+                            <thead><tr><th class="num">#</th><th>Player</th><th class="num">P</th><th class="num">W</th><th class="num">D</th><th class="num">L</th><th class="num">GF</th><th class="num">GA</th><th class="num">GD</th><th class="num">Pts</th></tr></thead>
+                            <tbody>${table.map((r, i) => `<tr>
+                                <td class="num muted">${i+1}</td>
+                                <td>${playerLink(r.id)}</td>
+                                <td class="num">${r.p}</td>
+                                <td class="num">${r.w}</td>
+                                <td class="num">${r.d}</td>
+                                <td class="num">${r.l}</td>
+                                <td class="num">${r.gf}</td>
+                                <td class="num">${r.ga}</td>
+                                <td class="num">${r.gd >= 0 ? '+' : ''}${r.gd}</td>
+                                <td class="num accent">${r.pts}</td>
+                            </tr>`).join('')}</tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section>
+                    <h2 class="section-title">Roster · swap to refresh</h2>
+                    <div class="glass" style="padding:22px">
+                        ${coreIds.map(id => {
+                            const p = state.playersById.get(id);
+                            return `<div class="swap-row" data-core-id="${id}">
+                                <div class="pname">${playerLink(id)} <span class="muted" style="font-size:12px">core</span></div>
+                                <select data-core-id="${id}">
+                                    <option value="">Swap with…</option>
+                                    ${swappable.map(s => {
+                                        const sp = state.playersById.get(s.player_id);
+                                        return sp ? `<option value="${s.player_id}|${s.role}">${esc(sp.nickname)} (${s.label})</option>` : '';
+                                    }).join('')}
+                                </select>
+                            </div>`;
+                        }).join('')}
+                        <div class="swap-row"><div class="muted" style="font-size:12px">Subs in this group: ${subIds.length ? subIds.map(id => playerLink(id)).join(', ') : '<span class="dim">none</span>'}</div></div>
+                    </div>
+                </section>
+
+                <section>
+                    <h2 class="section-title">Rivalry tracker</h2>
+                    <div class="three-col">
+                        ${rivalryCard('Most goals', mostGoals, p => `${p.goals} goals over ${p.matches.length} matches`)}
+                        ${rivalryCard('Most draws', mostDraws, p => `${p.draws} draws over ${p.matches.length} matches`)}
+                        ${rivalryCard('Most upsets', mostUpsets, p => `${p.upsets} upsets over ${p.matches.length} matches`)}
+                    </div>
+                </section>
+
+                <section>
+                    <h2 class="section-title">Trend analysis</h2>
+                    <div class="glass" style="padding:0">
+                        <table class="data">
+                            <thead><tr><th>Metric</th><th class="num">Value</th><th class="muted">Notes</th></tr></thead>
+                            <tbody>
+                                <tr><td>BTTS %</td><td class="num accent">${pct(bttsN)}%</td><td class="muted">both teams scored</td></tr>
+                                <tr><td>Over 2.5 goals</td><td class="num accent">${pct(ov25)}%</td><td class="muted">${ov25}/${totalN} matches</td></tr>
+                                <tr><td>Over 3.5 goals</td><td class="num accent">${pct(ov35)}%</td><td class="muted">${ov35}/${totalN}</td></tr>
+                                <tr><td>Over 4.5 goals</td><td class="num accent">${pct(ov45)}%</td><td class="muted">${ov45}/${totalN}</td></tr>
+                                <tr><td>Draw % start vs end</td><td class="num">${drawPctFirst ?? '—'}% → ${drawPctLast ?? '—'}%</td><td class="muted">first vs last half of each tournament</td></tr>
+                                <tr><td>Avg goals first vs last match</td><td class="num">${goalsAvgFirst} → ${goalsAvgLast}</td><td class="muted">per tournament</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section>
+                    <h2 class="section-title">Tournament history</h2>
+                    <div style="display:flex;flex-direction:column;gap:10px">
+                        ${tournamentList.length ? tournamentList.map(t => {
+                            const ms = allFinished.filter(m => m.tournament_id === t.tid && (groupSet.has(m.player1_id) || groupSet.has(m.player2_id)));
+                            return tournamentBlock(t.tid, ms, tourMeta.get(t.tid));
+                        }).join('') : '<div class="glass empty">No tournaments involving this group.</div>'}
+                    </div>
+                </section>
+            `;
+
+            // Wire up swap dropdowns
+            app.querySelectorAll('.swap-row select').forEach(sel => {
+                sel.addEventListener('change', async (e) => {
+                    const coreId = +sel.dataset.coreId;
+                    const v = sel.value;
+                    if (!v) return;
+                    const [otherId, otherRole] = v.split('|').map((s, i) => i === 0 ? +s : s);
+                    sel.disabled = true;
+                    try {
+                        // Find current rows
+                        const coreRow = state.members.find(m => m.player_id === coreId && m.group_id === gid);
+                        const otherRow = state.members.find(m => m.player_id === otherId);
+                        if (!coreRow || !otherRow) throw new Error('membership row missing');
+                        // Swap: core goes to other's group/role, other becomes core in this group
+                        const { error: e1 } = await sb.from('group_members').update({
+                            group_id: otherRow.group_id, role: otherRow.role,
+                        }).eq('id', coreRow.id);
+                        if (e1) throw e1;
+                        const { error: e2 } = await sb.from('group_members').update({
+                            group_id: gid, role: 'core',
+                        }).eq('id', otherRow.id);
+                        if (e2) throw e2;
+                        // Reload memberships and re-render
+                        await loadGroupsAndMembers();
+                        await render();
+                    } catch (err) {
+                        console.error(err);
+                        alert('Swap failed: ' + (err.message ?? err));
+                        sel.disabled = false;
+                    }
+                });
+            });
+
+            // Wire up tournament collapsibles
+            app.querySelectorAll('.tournament-block .head').forEach(h => {
+                h.addEventListener('click', () => h.parentElement.classList.toggle('open'));
+            });
+        }
+
+        function rivalryCard(title, pair, formatter) {
+            if (!pair) return `<div class="glass opp-card"><div class="sub">${title}</div><div class="muted">no data</div></div>`;
+            return `<div class="glass opp-card">
+                <div class="sub">${title}</div>
+                <div class="nick">${playerLink(pair.lo)} <span class="muted">vs</span> ${playerLink(pair.hi)}</div>
+                <div class="muted" style="font-size:12px;margin-top:8px">${formatter(pair)}</div>
+            </div>`;
+        }
+
+        // ---------- COMPARE ----------
+        async function renderCompare(app, aNick, bNick) {
+            // Initial selectors
+            const opts = state.players.map(p => `<option value="${esc(p.nickname)}"${aNick === p.nickname ? ' selected' : ''}>${esc(p.nickname)}</option>`).join('');
+            const optsB = state.players.map(p => `<option value="${esc(p.nickname)}"${bNick === p.nickname ? ' selected' : ''}>${esc(p.nickname)}</option>`).join('');
+            app.innerHTML = `
+                <section>
+                    <h2 class="section-title">Compare players</h2>
+                    <div class="glass" style="padding:22px">
+                        <div class="controls">
+                            <select id="cmp-a" class="search-input" style="min-width:260px"><option value="">Select player A…</option>${opts}</select>
+                            <select id="cmp-b" class="search-input" style="min-width:260px"><option value="">Select player B…</option>${optsB}</select>
+                            <button class="btn primary" id="cmp-go">Compare</button>
+                        </div>
+                    </div>
+                </section>
+                <section id="cmp-body"></section>
+            `;
+            const aEl = document.getElementById('cmp-a');
+            const bEl = document.getElementById('cmp-b');
+            const goEl = document.getElementById('cmp-go');
+            const body = document.getElementById('cmp-body');
+
+            const doRender = async () => {
+                const aN = aEl.value, bN = bEl.value;
+                if (!aN || !bN) { body.innerHTML = '<div class="glass empty">Select two players.</div>'; return; }
+                if (aN === bN) { body.innerHTML = '<div class="glass empty">Pick two different players.</div>'; return; }
+                location.hash = `#/compare/${encodeURIComponent(aN)}/${encodeURIComponent(bN)}`;
+                await renderCompareBody(body, aN, bN);
+            };
+            goEl.addEventListener('click', doRender);
+            aEl.addEventListener('change', doRender);
+            bEl.addEventListener('change', doRender);
+            if (aNick && bNick) await renderCompareBody(body, aNick, bNick);
+            else if (aNick) body.innerHTML = '<div class="glass empty">Select the second player.</div>';
+            else body.innerHTML = '<div class="glass empty">Select two players to compare.</div>';
+        }
+
+        async function renderCompareBody(container, aNick, bNick) {
+            const a = findPlayerByNickname(aNick), b = findPlayerByNickname(bNick);
+            if (!a || !b) { container.innerHTML = '<div class="glass empty">One of the players was not found.</div>'; return; }
+            destroyCharts();
+            const allFinished = await fetchAllFinished();
+            const aMatches = allFinished.filter(m => m.player1_id === a.id || m.player2_id === a.id);
+            const bMatches = allFinished.filter(m => m.player1_id === b.id || m.player2_id === b.id);
+            const aPS = (await sb.from('player_stats').select('*').eq('player_id', a.id).limit(1)).data?.[0] ?? null;
+            const bPS = (await sb.from('player_stats').select('*').eq('player_id', b.id).limit(1)).data?.[0] ?? null;
+            const aRates = computeRates(aMatches, a.id);
+            const bRates = computeRates(bMatches, b.id);
+            const aClutch = computeClutch(allFinished, a.id);
+            const bClutch = computeClutch(allFinished, b.id);
+            const aStreak = computeStreak(aMatches, a.id);
+            const bStreak = computeStreak(bMatches, b.id);
+            const aWR = aPS?.matches_played ? Math.round(100 * aPS.wins / aPS.matches_played) : 0;
+            const bWR = bPS?.matches_played ? Math.round(100 * bPS.wins / bPS.matches_played) : 0;
+
+            const aLast5 = aMatches.slice(0, 5);
+            const bLast5 = bMatches.slice(0, 5);
+
+            // H2H
+            const lo = Math.min(a.id, b.id), hi = Math.max(a.id, b.id);
+            const { data: h2hData } = await sb.from('h2h_stats').select('*').eq('player1_id', lo).eq('player2_id', hi).limit(1);
+            const h = h2hData?.[0];
+
+            const distA = buildScoreDistribution(aMatches, a.id);
+            const distB = buildScoreDistribution(bMatches, b.id);
+
+            const cmpRow = (label, av, bv, win) => {
+                let aClass = '', bClass = '';
+                if (win === 'higher') { if (av > bv) aClass = 'win'; else if (bv > av) bClass = 'win'; }
+                else if (win === 'lower') { if (av < bv) aClass = 'win'; else if (bv < av) bClass = 'win'; }
+                return `<div class="compare-stat-row">
+                    <div class="left v ${aClass}">${av}</div>
+                    <div class="lab">${esc(label)}</div>
+                    <div class="right v ${bClass}">${bv}</div>
+                </div>`;
+            };
+            const fmtR = (r) => r === 'W' ? '<span class="badge W">W</span>' : r === 'L' ? '<span class="badge L">L</span>' : '<span class="badge D">D</span>';
+
+            container.innerHTML = `
+                <div class="compare-grid" style="margin-bottom:18px">
+                    <div class="glass" style="padding:24px">
+                        <div style="font-size:24px;font-weight:800;letter-spacing:-0.5px;margin-bottom:6px">${playerLink(a.id)}</div>
+                        <div class="muted" style="font-size:12px">${esc(state.groupsById.get(state.memberByPlayerId.get(a.id)?.group_id)?.name ?? '')}</div>
+                    </div>
+                    <div class="glass" style="padding:24px">
+                        <div style="font-size:24px;font-weight:800;letter-spacing:-0.5px;margin-bottom:6px">${playerLink(b.id)}</div>
+                        <div class="muted" style="font-size:12px">${esc(state.groupsById.get(state.memberByPlayerId.get(b.id)?.group_id)?.name ?? '')}</div>
+                    </div>
+                </div>
+
+                <div class="glass" style="padding:0;margin-bottom:18px">
+                    ${cmpRow('Matches', aPS?.matches_played ?? 0, bPS?.matches_played ?? 0, 'higher')}
+                    ${cmpRow('Wins', aPS?.wins ?? 0, bPS?.wins ?? 0, 'higher')}
+                    ${cmpRow('Win rate', `${aWR}%`, `${bWR}%`, 'higher')}
+                    ${cmpRow('Avg GF', Number(aPS?.avg_gf ?? 0).toFixed(2), Number(bPS?.avg_gf ?? 0).toFixed(2), 'higher')}
+                    ${cmpRow('Avg GA', Number(aPS?.avg_ga ?? 0).toFixed(2), Number(bPS?.avg_ga ?? 0).toFixed(2), 'lower')}
+                    ${cmpRow('Clean sheets', `${aRates.cleanSheetPct}%`, `${bRates.cleanSheetPct}%`, 'higher')}
+                    ${cmpRow('High-scoring (&gt;3.5)', `${aRates.over35Pct}%`, `${bRates.over35Pct}%`, 'higher')}
+                    ${cmpRow('Clutch (final-match WR)', aClutch.clutchPct == null ? '—' : `${aClutch.clutchPct}%`, bClutch.clutchPct == null ? '—' : `${bClutch.clutchPct}%`, 'higher')}
+                    ${cmpRow('Current streak', aStreak ?? '—', bStreak ?? '—', null)}
+                </div>
+
+                ${h ? `<div class="glass" style="padding:24px;margin-bottom:18px">
+                    <div class="section-title">Head to head</div>
+                    <div style="display:flex;justify-content:space-around;text-align:center">
+                        <div><div style="font-size:32px;font-weight:700" class="accent">${a.id === lo ? h.wins_p1 : h.wins_p2}</div><div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:1px">wins</div></div>
+                        <div><div style="font-size:32px;font-weight:700">${h.matches_played}</div><div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:1px">matches · ${h.draws} draws</div></div>
+                        <div><div style="font-size:32px;font-weight:700" class="accent">${a.id === lo ? h.wins_p2 : h.wins_p1}</div><div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:1px">wins</div></div>
+                    </div>
+                </div>` : ''}
+
+                <div class="compare-grid" style="margin-bottom:18px">
+                    <div class="glass" style="padding:22px">
+                        <div class="section-title">Last 5 — ${esc(a.nickname)}</div>
+                        ${aLast5.length ? aLast5.map(m => `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line-soft);font-size:13px">
+                            ${fmtR(resultOf(m, a.id))}
+                            <span>vs ${playerLink(m.player1_id === a.id ? m.player2_id : m.player1_id)}</span>
+                            <span class="muted">${ownGoals(m, a.id)}–${oppGoals(m, a.id)}</span>
+                            <span class="muted" style="font-size:11px">${fmtAgo(m.date)}</span>
+                        </div>`).join('') : '<div class="muted">no matches</div>'}
+                    </div>
+                    <div class="glass" style="padding:22px">
+                        <div class="section-title">Last 5 — ${esc(b.nickname)}</div>
+                        ${bLast5.length ? bLast5.map(m => `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line-soft);font-size:13px">
+                            ${fmtR(resultOf(m, b.id))}
+                            <span>vs ${playerLink(m.player1_id === b.id ? m.player2_id : m.player1_id)}</span>
+                            <span class="muted">${ownGoals(m, b.id)}–${oppGoals(m, b.id)}</span>
+                            <span class="muted" style="font-size:11px">${fmtAgo(m.date)}</span>
+                        </div>`).join('') : '<div class="muted">no matches</div>'}
+                    </div>
+                </div>
+
+                <div class="compare-grid">
+                    <div class="glass chart-wrap tall"><canvas id="dist-a"></canvas></div>
+                    <div class="glass chart-wrap tall"><canvas id="dist-b"></canvas></div>
+                </div>
+            `;
+
+            const mkDistChart = (id, dist) => {
+                const ctx = document.getElementById(id).getContext('2d');
+                const c = new Chart(ctx, {
+                    type: 'bar',
+                    data: { labels: dist.labels, datasets: [
+                        { label: 'Wins',   data: dist.wins,   backgroundColor: 'rgba(0,255,135,0.7)' },
+                        { label: 'Draws',  data: dist.draws,  backgroundColor: 'rgba(255,255,255,0.25)' },
+                        { label: 'Losses', data: dist.losses, backgroundColor: 'rgba(255,91,91,0.7)' },
+                    ] },
+                    options: { ...chartOpts(true), scales: { x: { ...chartGrid(), stacked: true }, y: { ...chartGrid(), beginAtZero: true, stacked: true, ticks: { stepSize: 1, color: '#666' } } } },
+                });
+                state.charts.push(c);
+            };
+            mkDistChart('dist-a', distA);
+            mkDistChart('dist-b', distB);
+        }
+
+        // ---------- PREDICTIONS ----------
         async function renderPredictions(app) {
-            const all = await fetchAllPredictions();
-            if (all === null) {
+            let all;
+            try {
+                const { data, error } = await sb.from('predictions').select(`
+                    id, predicted_winner_id, predicted_score1, predicted_score2, confidence,
+                    winner_correct, score_correct, evaluated_at,
+                    match:matches!predictions_match_id_fkey(id, date, status, score1, score2, player1_id, player2_id)
+                `).order('id', { ascending: false }).limit(500);
+                if (error) throw error;
+                all = data ?? [];
+            } catch (e) {
                 app.innerHTML = `<section class="glass empty">
-                    The <code>predictions</code> table doesn't exist yet. Apply the migration in <code>sql/schema.sql</code> via the Supabase SQL Editor.
+                    The <code>predictions</code> table doesn't exist yet. Apply the migration in <code>sql/schema.sql</code>.
                 </section>`;
                 return;
             }
             const evaluated = all.filter(p => p.evaluated_at);
-            const winnerCorrect = evaluated.filter(p => p.winner_correct).length;
-            const scoreCorrect = evaluated.filter(p => p.score_correct).length;
-            const winnerAcc = evaluated.length ? Math.round(100 * winnerCorrect / evaluated.length) : 0;
-            const scoreAcc = evaluated.length ? Math.round(100 * scoreCorrect / evaluated.length) : 0;
+            const wOK = evaluated.filter(p => p.winner_correct).length;
+            const sOK = evaluated.filter(p => p.score_correct).length;
+            const wAcc = evaluated.length ? Math.round(100 * wOK / evaluated.length) : 0;
+            const sAcc = evaluated.length ? Math.round(100 * sOK / evaluated.length) : 0;
+
+            // Group breakdown
+            const byGroup = new Map();
+            for (const p of evaluated) {
+                if (!p.match) continue;
+                const m1 = state.memberByPlayerId.get(p.match.player1_id);
+                const m2 = state.memberByPlayerId.get(p.match.player2_id);
+                // Use the group of either core player, preferring same-group matches
+                let gid = null;
+                if (m1 && m2 && m1.group_id === m2.group_id && m1.group_id !== FLOAT_GROUP_ID) gid = m1.group_id;
+                else if (m1?.group_id !== FLOAT_GROUP_ID) gid = m1?.group_id ?? null;
+                else gid = m2?.group_id ?? null;
+                if (gid == null) continue;
+                if (!byGroup.has(gid)) byGroup.set(gid, []);
+                byGroup.get(gid).push(p);
+            }
+            const groupBreakdown = state.groups.filter(g => g.id !== FLOAT_GROUP_ID).map(g => {
+                const set = byGroup.get(g.id) ?? [];
+                const c = set.filter(p => p.winner_correct).length;
+                return { group: g, n: set.length, pct: set.length ? Math.round(100 * c / set.length) : null };
+            });
 
             const renderWith = (filter) => {
                 let rows = all;
@@ -946,8 +1781,24 @@
                     <div class="stats-grid">
                         ${statCard('Total predictions', all.length)}
                         ${statCard('Evaluated', evaluated.length)}
-                        ${statCard('Winner accuracy', `<span class="accent">${winnerAcc}%</span>`)}
-                        ${statCard('Exact-score accuracy', `<span class="accent">${scoreAcc}%</span>`)}
+                        ${statCard('Winner accuracy', `<span class="accent">${wAcc}%</span>`)}
+                        ${statCard('Exact-score accuracy', `<span class="accent">${sAcc}%</span>`)}
+                    </div>
+                </section>
+
+                <section>
+                    <h2 class="section-title">Accuracy by group</h2>
+                    <div class="glass table-wrap">
+                        <table class="data">
+                            <thead><tr><th>Group</th><th class="num">Evaluated</th><th class="num">Winner accuracy</th></tr></thead>
+                            <tbody>
+                                ${groupBreakdown.length ? groupBreakdown.map(b => `<tr>
+                                    <td><a class="player-link" href="#/group/${b.group.id}">${esc(b.group.name)}</a></td>
+                                    <td class="num">${b.n}</td>
+                                    <td class="num">${b.pct == null ? '<span class="muted">—</span>' : `<span class="accent">${b.pct}%</span>`}</td>
+                                </tr>`).join('') : '<tr><td colspan="3" class="empty">No graded predictions yet.</td></tr>'}
+                            </tbody>
+                        </table>
                     </div>
                 </section>
 
@@ -960,19 +1811,12 @@
                     </div>
                     <div class="glass scroll-table">
                         <table class="data">
-                            <thead>
-                                <tr>
-                                    <th>Match date</th>
-                                    <th>Player 1</th>
-                                    <th>Player 2</th>
-                                    <th>Predicted winner</th>
-                                    <th class="num">Confidence</th>
-                                    <th class="num">Predicted</th>
-                                    <th class="num">Actual</th>
-                                    <th>Winner</th>
-                                    <th>Score</th>
-                                </tr>
-                            </thead>
+                            <thead><tr>
+                                <th>Match date</th><th>Player 1</th><th>Player 2</th>
+                                <th>Predicted winner</th><th class="num">Confidence</th>
+                                <th class="num">Predicted</th><th class="num">Actual</th>
+                                <th>Winner</th><th>Score</th>
+                            </tr></thead>
                             <tbody id="pred-tbody">${renderWith('all')}</tbody>
                         </table>
                     </div>
@@ -992,21 +1836,12 @@
         function predictionRow(p) {
             if (!p.match) return '';
             const m = p.match;
-            const date = fmtTime(m.date);
-            const winnerName = p.predicted_winner_id
-                ? playerLink(p.predicted_winner_id)
-                : '<span class="dim">draw</span>';
-            const actual = m.status === STATUS.FINISHED
-                ? `${m.score1 ?? '–'}–${m.score2 ?? '–'}`
-                : '<span class="dim">—</span>';
-            const wIcon = p.evaluated_at
-                ? (p.winner_correct ? '<span class="check">✓</span>' : '<span class="cross">✗</span>')
-                : '<span class="dim">—</span>';
-            const sIcon = p.evaluated_at
-                ? (p.score_correct ? '<span class="check">✓</span>' : '<span class="cross">✗</span>')
-                : '<span class="dim">—</span>';
+            const winnerName = p.predicted_winner_id ? playerLink(p.predicted_winner_id) : '<span class="dim">draw</span>';
+            const actual = m.status === STATUS.FINISHED ? `${m.score1 ?? '–'}–${m.score2 ?? '–'}` : '<span class="dim">—</span>';
+            const wIcon = p.evaluated_at ? (p.winner_correct ? '<span class="check">✓</span>' : '<span class="cross">✗</span>') : '<span class="dim">—</span>';
+            const sIcon = p.evaluated_at ? (p.score_correct ? '<span class="check">✓</span>' : '<span class="cross">✗</span>') : '<span class="dim">—</span>';
             return `<tr>
-                <td>${date}</td>
+                <td>${fmtTime(m.date)}</td>
                 <td>${playerLink(m.player1_id)}</td>
                 <td>${playerLink(m.player2_id)}</td>
                 <td>${winnerName}</td>
@@ -1018,14 +1853,12 @@
             </tr>`;
         }
 
-        // ---------- search ----------
+        // ---------- search & drawer ----------
         function renderSearchResults(query) {
             const dropdown = document.getElementById('search-dropdown');
             const q = query.trim().toLowerCase();
             if (!q) { dropdown.classList.remove('open'); dropdown.innerHTML = ''; return; }
-            const matches = state.players.filter(p =>
-                p.nickname && p.nickname.toLowerCase().includes(q)
-            ).slice(0, 10);
+            const matches = state.players.filter(p => p.nickname && p.nickname.toLowerCase().includes(q)).slice(0, 10);
             if (!matches.length) {
                 dropdown.innerHTML = '<div class="empty-row">No matching player.</div>';
             } else {
@@ -1039,29 +1872,43 @@
             }
             dropdown.classList.add('open');
         }
-
         function setupSearch() {
             const input = document.getElementById('search-input');
             const dropdown = document.getElementById('search-dropdown');
             input.addEventListener('input', e => renderSearchResults(e.target.value));
             input.addEventListener('focus', e => { if (e.target.value.trim()) renderSearchResults(e.target.value); });
-            document.addEventListener('click', e => {
-                if (!e.target.closest('.search-wrap')) dropdown.classList.remove('open');
-            });
-            dropdown.addEventListener('click', () => {
-                input.value = '';
-                dropdown.classList.remove('open');
-            });
+            document.addEventListener('click', e => { if (!e.target.closest('.search-wrap')) dropdown.classList.remove('open'); });
+            dropdown.addEventListener('click', () => { input.value = ''; dropdown.classList.remove('open'); });
         }
-
         function setupDrawer() {
             const drawer = document.getElementById('players-drawer');
             const backdrop = document.getElementById('drawer-backdrop');
             const btn = document.getElementById('players-btn');
             const list = document.getElementById('players-list');
-            list.innerHTML = state.players
-                .map(p => `<a href="#/player/${encodeURIComponent(p.nickname)}">${esc(p.nickname)}</a>`)
-                .join('');
+            const groupedByGroup = new Map();
+            for (const p of state.players) {
+                const m = state.memberByPlayerId.get(p.id);
+                const gid = m ? m.group_id : null;
+                if (!groupedByGroup.has(gid)) groupedByGroup.set(gid, []);
+                groupedByGroup.get(gid).push(p);
+            }
+            const blocks = [];
+            for (const g of state.groups) {
+                const set = groupedByGroup.get(g.id);
+                if (!set?.length) continue;
+                blocks.push(`<div class="group-block">
+                    <div class="gname">${esc(g.name)}</div>
+                    ${set.map(p => `<a href="#/player/${encodeURIComponent(p.nickname)}">${esc(p.nickname)}</a>`).join('')}
+                </div>`);
+            }
+            const ungrouped = groupedByGroup.get(null);
+            if (ungrouped?.length) {
+                blocks.push(`<div class="group-block">
+                    <div class="gname">Unassigned</div>
+                    ${ungrouped.map(p => `<a href="#/player/${encodeURIComponent(p.nickname)}">${esc(p.nickname)}</a>`).join('')}
+                </div>`);
+            }
+            list.innerHTML = blocks.join('');
             const open = () => { drawer.classList.add('open'); backdrop.classList.add('open'); };
             const close = () => { drawer.classList.remove('open'); backdrop.classList.remove('open'); };
             btn.addEventListener('click', open);
@@ -1069,18 +1916,30 @@
             drawer.addEventListener('click', e => { if (e.target.tagName === 'A') close(); });
         }
 
-        // ---------- init ----------
+        // ---------- bootstrap ----------
+        async function loadGroupsAndMembers() {
+            const [groups, members] = await Promise.all([
+                loadAll('groups', 'id, name, created_at').catch(() => []),
+                loadAll('group_members', 'id, group_id, player_id, role, created_at').catch(() => []),
+            ]);
+            state.groups = groups.sort((a, b) => a.id - b.id);
+            state.groupsById = new Map(groups.map(g => [g.id, g]));
+            state.members = members;
+            state.memberByPlayerId = new Map(members.map(m => [m.player_id, m]));
+        }
+
         async function init() {
             try {
-                state.players = (await loadAllPlayers())
+                state.players = (await loadAll('players', 'id, nickname, photo'))
                     .filter(p => p.nickname)
                     .sort((a, b) => a.nickname.localeCompare(b.nickname, undefined, { sensitivity: 'base' }));
                 state.playersByName = new Map(state.players.map(p => [p.nickname.toLowerCase(), p]));
                 state.playersById = new Map(state.players.map(p => [p.id, p]));
+                await loadGroupsAndMembers();
                 setupSearch();
                 setupDrawer();
                 await render();
-                setInterval(() => { render(); }, REFRESH_MS);
+                setInterval(() => render(), REFRESH_MS);
             } catch (err) {
                 document.getElementById('app').innerHTML =
                     `<div class="empty">Failed to bootstrap: ${esc(err.message ?? err)}</div>`;

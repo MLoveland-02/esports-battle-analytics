@@ -84,3 +84,22 @@ create table if not exists predictions (
 
 create index if not exists idx_predictions_match  on predictions(match_id);
 create index if not exists idx_predictions_winner on predictions(predicted_winner_id);
+
+create table if not exists groups (
+    id         serial primary key,
+    name       text not null,
+    created_at timestamptz not null default now()
+);
+
+create table if not exists group_members (
+    id         serial primary key,
+    group_id   integer not null references groups(id),
+    player_id  integer not null references players(id),
+    role       text    not null,
+    created_at timestamptz not null default now(),
+    constraint group_members_unique unique (group_id, player_id),
+    constraint group_members_role_check check (role in ('core', 'sub', 'float'))
+);
+
+create index if not exists idx_group_members_group  on group_members(group_id);
+create index if not exists idx_group_members_player on group_members(player_id);
