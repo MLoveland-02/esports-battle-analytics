@@ -172,19 +172,29 @@ async function alreadyComplete(tournamentId) {
     return Boolean(log?.length);
 }
 
-async function loadTrackedPlayerIds() {
-    const all = new Set();
+async function loadNickToCanonId() {
+    // Each tournament in the API may issue a NEW player_id for the same
+    // nickname. We map every appearance of a tracked nickname back to one
+    // canonical id (the one already in our players table). Without this, the
+    // ID-only filter rejects ~99% of valid matches.
+    const map = new Map(); // lower nickname -> canonical id
     const PAGE = 1000;
     let from = 0;
     while (true) {
         const { data, error } = await supabase
-            .from('players').select('id').range(from, from + PAGE - 1);
+            .from('players').select('id, nickname').range(from, from + PAGE - 1);
         if (error) throw error;
-        for (const p of data) all.add(p.id);
+        for (const p of data) {
+            if (!p.nickname) continue;
+            const lc = p.nickname.toLowerCase();
+            // Stable choice: prefer the smallest canonical id if duplicates
+            // ever appear (shouldn't after cleanup).
+            if (!map.has(lc) || map.get(lc) > p.id) map.set(lc, p.id);
+        }
         if (data.length < PAGE) break;
         from += PAGE;
     }
-    return all;
+    return map;
 }
 
 async function upsertChunked(table, rows, conflictTarget) {
@@ -300,7 +310,7 @@ async function recalcH2HStats(pairs) {
 
 // ---------- main ----------
 
-async function processTournament(rawTournament, trackedIds) {
+async function processTournament(rawTournament, nickToCanonId) {
     const tournament = mapTournament(rawTournament);
     if (tournament.id == null) return;
 
@@ -320,19 +330,26 @@ async function processTournament(rawTournament, trackedIds) {
     for (const raw of rawMatches) {
         const match = mapMatch(raw);
         if (match.player1_id == null || match.player2_id == null) continue;
-        if (!trackedIds.has(match.player1_id) || !trackedIds.has(match.player2_id)) continue;
+        const p1Raw = raw.participant1 ?? {};
+        const p2Raw = raw.participant2 ?? {};
+        if (!p1Raw.nickname || !p2Raw.nickname) continue;
+        const canon1 = nickToCanonId.get(p1Raw.nickname.toLowerCase());
+        const canon2 = nickToCanonId.get(p2Raw.nickname.toLowerCase());
+        if (!canon1 || !canon2) continue;
+        // Remap participant ids to the canonical ids we already have stored.
+        match.player1_id = canon1;
+        match.player2_id = canon2;
         matchRows.push(match);
 
-        const p1 = mapPlayer(raw.participant1 ?? {});
-        const p2 = mapPlayer(raw.participant2 ?? {});
-        if (p1.id != null) players.set(p1.id, p1);
-        if (p2.id != null) players.set(p2.id, p2);
+        // Always upsert the canonical player rows with the latest nickname/photo.
+        players.set(canon1, { id: canon1, nickname: p1Raw.nickname, photo: p1Raw.photo ?? null });
+        players.set(canon2, { id: canon2, nickname: p2Raw.nickname, photo: p2Raw.photo ?? null });
 
-        playerIdSet.add(match.player1_id);
-        playerIdSet.add(match.player2_id);
+        playerIdSet.add(canon1);
+        playerIdSet.add(canon2);
 
-        const lo = Math.min(match.player1_id, match.player2_id);
-        const hi = Math.max(match.player1_id, match.player2_id);
+        const lo = Math.min(canon1, canon2);
+        const hi = Math.max(canon1, canon2);
         pairSet.add(`${lo}:${hi}`);
     }
 
@@ -361,10 +378,10 @@ async function processTournament(rawTournament, trackedIds) {
 }
 
 async function main() {
-    console.log('Loading tracked players...');
-    const trackedIds = await loadTrackedPlayerIds();
-    console.log(`Tracking ${trackedIds.size} players.`);
-    if (trackedIds.size === 0) {
+    console.log('Loading tracked nicknames -> canonical ids...');
+    const nickToCanonId = await loadNickToCanonId();
+    console.log(`Tracking ${nickToCanonId.size} nicknames.`);
+    if (nickToCanonId.size === 0) {
         console.error('No tracked players in DB. Seed players first or run cleanup.js.');
         process.exit(1);
     }
@@ -376,7 +393,7 @@ async function main() {
     let ok = 0, failed = 0;
     for (const t of tournaments) {
         try {
-            await processTournament(t, trackedIds);
+            await processTournament(t, nickToCanonId);
             ok += 1;
         } catch (err) {
             failed += 1;
