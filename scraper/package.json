@@ -7,6 +7,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js && node predict.js",
+    "full-scrape": "node index.js --full && node predict.js",
     "scrape": "node index.js",
     "predict": "node predict.js",
     "cleanup": "node cleanup.js"

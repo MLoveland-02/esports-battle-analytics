@@ -2,8 +2,14 @@ name: scrape
 
 on:
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: '*/5 * * * *'   # fast live-update (7-day window)
+    - cron: '0 3 * * *'     # daily full backfill (365-day window)
   workflow_dispatch:
+    inputs:
+      full:
+        description: 'Run full 365-day backfill'
+        type: boolean
+        default: false
 
 concurrency:
   group: scrape
@@ -26,7 +32,26 @@ jobs:
         working-directory: scraper
         run: npm install
 
-      - name: Run scraper
+      - name: Run scraper (fast)
+        if: github.event_name == 'schedule' && github.event.schedule == '*/5 * * * *'
+        working-directory: scraper
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: npm start
+
+      - name: Run scraper (full backfill)
+        if: >
+          (github.event_name == 'schedule' && github.event.schedule == '0 3 * * *') ||
+          (github.event_name == 'workflow_dispatch' && inputs.full == true)
+        working-directory: scraper
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: npm run full-scrape
+
+      - name: Run scraper (manual fast)
+        if: github.event_name == 'workflow_dispatch' && inputs.full == false
         working-directory: scraper
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}

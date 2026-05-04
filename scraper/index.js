@@ -9,7 +9,10 @@ dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 const API_BASE = 'https://football.esportsbattle.com/api';
 const STATUS_FINISHED = 3;
-const LOOKBACK_DAYS = 365;
+// Live cron runs scan only recent days. Pass --full (or FULL_SCRAPE=1) to
+// backfill the entire history (expensive: ~365 API calls).
+const FULL_SCRAPE = process.argv.includes('--full') || process.env.FULL_SCRAPE === '1';
+const LOOKBACK_DAYS = FULL_SCRAPE ? 365 : 7;
 
 const DEFAULT_HEADERS = {
     accept: '*/*',
