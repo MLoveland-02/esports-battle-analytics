@@ -10,13 +10,13 @@ const STATUS_UPCOMING = 1;
 const STATUS_FINISHED = 3;
 
 const RECENT_LIMIT = 10;
-const MIN_H2H_FOR_USE = 3;
-const W_H2H = 0.40;
-const W_FORM = 0.35;
+const MIN_H2H_FOR_USE = 5;
+const W_H2H = 0.35;
+const W_FORM = 0.40;
 const W_OVERALL = 0.25;
 const W_FORM_NO_H2H = 0.60;
 const W_OVERALL_NO_H2H = 0.40;
-const DRAW_BAND = 0.02;
+const DRAW_BAND = 0.01;
 
 const { SUPABASE_URL, SUPABASE_ANON_KEY } = process.env;
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
@@ -118,16 +118,24 @@ function predictMatch(match, ctx) {
     }
     const confidence = Number((Math.max(score, 1 - score) * 100).toFixed(2));
 
-    let predScore1, predScore2;
+    // Bug #3: use h2h avg when 5+ matches, else player_stats; add ±0.3 variance
+    const p1IsLo = p1Id === lo;
+    let gf1Raw, gf2Raw;
     if (haveH2H) {
-        const p1IsLo = p1Id === lo;
-        const gf1 = Number(p1IsLo ? h2h.avg_gf_p1 : h2h.avg_gf_p2);
-        const gf2 = Number(p1IsLo ? h2h.avg_gf_p2 : h2h.avg_gf_p1);
-        predScore1 = Math.max(0, Math.round(gf1));
-        predScore2 = Math.max(0, Math.round(gf2));
+        gf1Raw = Number(p1IsLo ? h2h.avg_gf_p1 : h2h.avg_gf_p2);
+        gf2Raw = Number(p1IsLo ? h2h.avg_gf_p2 : h2h.avg_gf_p1);
     } else {
-        predScore1 = Math.max(0, Math.round(Number(ps1?.avg_gf ?? 0)));
-        predScore2 = Math.max(0, Math.round(Number(ps2?.avg_gf ?? 0)));
+        gf1Raw = Number(ps1?.avg_gf ?? 0);
+        gf2Raw = Number(ps2?.avg_gf ?? 0);
+    }
+    let predScore1 = Math.max(0, Math.round(gf1Raw + (Math.random() * 0.6 - 0.3)));
+    let predScore2 = Math.max(0, Math.round(gf2Raw + (Math.random() * 0.6 - 0.3)));
+
+    // Bug #1: scores must strictly reflect the predicted winner
+    if (predictedWinnerId === p1Id && predScore1 <= predScore2) {
+        predScore1 = predScore2 + 1;
+    } else if (predictedWinnerId === p2Id && predScore2 <= predScore1) {
+        predScore2 = predScore1 + 1;
     }
 
     return {
